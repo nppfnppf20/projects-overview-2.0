@@ -1,4 +1,33 @@
+# Node
 node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# SvelteKit build / temp files
+.svelte-kit
+build
+
+# IDE / OS files
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Optional Log files
+logs
+*.log
 
 # Output
 .output
@@ -9,7 +38,6 @@ node_modules
 /build
 
 # OS
-.DS_Store
 Thumbs.db
 
 # Env
