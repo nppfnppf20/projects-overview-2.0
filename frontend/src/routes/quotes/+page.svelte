@@ -4,10 +4,12 @@
     allQuotes, 
     addQuote as addQuoteToStore, 
     updateQuoteInstructionStatus, 
+    deleteQuote,
     type InstructionStatus, 
     type Quote, 
     type LineItem
   } from "$lib/stores/projectStore";
+  import LineItemsModal from '$lib/components/LineItemsModal.svelte';
   
   // Instruction status options for dropdown (can be imported or defined here)
   const instructionStatuses: InstructionStatus[] = [
@@ -39,6 +41,10 @@
     description: '',
     cost: 0
   };
+  
+  // State for viewing line items modal
+  let showLineItemsModal = false;
+  let selectedQuoteForLineItems: Quote | null = null;
   
   function openNewQuoteModal() {
     showNewQuoteModal = true;
@@ -111,6 +117,13 @@
       // Optionally add feedback like a toast message
   }
   
+  function handleDeleteQuote(quoteId: string, organisationName: string) {
+    if (confirm(`Are you sure you want to delete the quote from ${organisationName}? This cannot be undone.`)) {
+      deleteQuote(quoteId);
+      // Note: Related reviews are not automatically deleted by this action yet.
+    }
+  }
+  
   // Calculate total for new quote
   $: newQuoteTotal = newQuoteForm.lineItems.reduce((sum, item) => sum + item.cost, 0);
   
@@ -118,6 +131,17 @@
   $: filteredQuotes = $selectedProject 
     ? $allQuotes.filter(quote => quote.projectId === $selectedProject.id) 
     : [];
+
+  // Functions for Line Items Modal
+  function openLineItemsModal(quote: Quote) {
+      selectedQuoteForLineItems = quote;
+      showLineItemsModal = true;
+  }
+
+  function closeLineItemsModal() {
+      showLineItemsModal = false;
+      selectedQuoteForLineItems = null;
+  }
 </script>
 
 <div class="quotes-container">
@@ -154,7 +178,18 @@
               <td>{quote.organisation}</td>
               <td>{quote.contactName}</td>
               <td><a href="mailto:{quote.email}">{quote.email}</a></td>
-              <td class="text-center">{quote.lineItems}</td>
+              <td class="text-center">
+                <button 
+                    type="button" 
+                    class="line-items-button" 
+                    title="View Line Items" 
+                    on:click={() => openLineItemsModal(quote)}
+                    aria-label={`View ${quote.lineItems.length} line items`}
+                >
+                  {quote.lineItems.length}
+                  <span class="plus-sign">+</span>
+                </button>
+              </td>
               <td class="text-right">£{quote.total.toFixed(2)}</td>
               <td>
                 <select 
@@ -168,18 +203,18 @@
                 </select>
               </td>
               <td class="action-cell">
-                <button class="action-btn view-btn" title="View Quote">View</button>
+                <button 
+                  class="action-btn delete-btn" 
+                  title="Delete Quote" 
+                  on:click={() => handleDeleteQuote(quote.id, quote.organisation)}
+                >Delete</button>
                 <button class="action-btn edit-btn" title="Edit Quote">Edit</button>
               </td>
-              <td class="action-cell">
-                <button class="action-btn download-btn" title="Download Quote">Download</button>
+              <td class="action-cell icon-cell">
+                <button class="action-btn icon-btn" title="Manage Quote Documents (TBD)">📎</button>
               </td>
-              <td class="action-cell">
-                {#if quote.instructionStatus !== 'instructed'}
-                  <button class="action-btn instruct-btn" title="Instruct Surveyor">Instruct</button>
-                {:else}
-                  <button class="action-btn details-btn" title="View Instruction Details">Details</button>
-                {/if}
+              <td class="action-cell icon-cell">
+                <button class="action-btn icon-btn" title="Manage Instruction Documents (TBD)">📎</button>
               </td>
             </tr>
           {/each}
@@ -291,6 +326,15 @@
         </div>
       </div>
     </div>
+  {/if}
+
+  <!-- Line Items Modal -->
+  {#if showLineItemsModal && selectedQuoteForLineItems}
+    <LineItemsModal 
+      items={selectedQuoteForLineItems.lineItems} 
+      organisationName={selectedQuoteForLineItems.organisation} 
+      on:close={closeLineItemsModal} 
+    />
   {/if}
 </div>
 
@@ -706,5 +750,52 @@
   
   .submit-btn:hover {
     background-color: #0069d9;
+  }
+
+  .line-items-button {
+      background: none;
+      border: none;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+      font-size: 0.95rem; /* Match table text */
+      color: #007bff; /* Make it look clickable */
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border-radius: 4px;
+  }
+
+  .line-items-button:hover {
+      text-decoration: underline;
+      background-color: rgba(0, 123, 255, 0.1);
+  }
+
+  .plus-sign {
+      font-weight: bold;
+      font-size: 1.1em; /* Slightly larger plus */
+      line-height: 1;
+  }
+
+  .delete-btn {
+    background-color: #dc3545;
+    color: white;
+  }
+
+  .icon-cell {
+      text-align: center;
+  }
+
+  .icon-btn {
+      background: none;
+      border: none;
+      font-size: 1.3rem; /* Larger icon size */
+      cursor: pointer;
+      color: #6c757d; /* Grey color */
+      padding: 0.2rem;
+      line-height: 1;
+  }
+  
+  .icon-btn:hover {
+      color: #343a40;
   }
 </style> 

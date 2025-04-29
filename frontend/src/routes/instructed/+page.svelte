@@ -4,8 +4,10 @@
     allQuotes, 
     allReviews, 
     addOrUpdateReview, // Use this to update dates
+    updateWorkStatus, // Import the new function
     type Quote, 
-    type SurveyorReview 
+    type SurveyorReview, 
+    type WorkStatus // Import the status type
   } from "$lib/stores/projectStore";
   
   // Filter for instructed quotes based on selected project
@@ -50,6 +52,16 @@
     // Trigger reactivity for the table (though store update should suffice)
     instructedQuotes = [...instructedQuotes]; 
   }
+  
+  // Function to handle work status change from dropdown
+  function handleWorkStatusChange(quoteId: string, newStatus: WorkStatus) {
+      if (!$selectedProject) return;
+      updateWorkStatus(quoteId, $selectedProject.id, newStatus);
+  }
+  
+  // Work status options for dropdown
+  const workStatuses: WorkStatus[] = ['not started', 'in progress', 'completed'];
+
 </script>
 
 <div class="instructed-container">
@@ -65,12 +77,27 @@
       <div class="survey-cards">
         {#each instructedQuotes as quote (quote.id)}
           {@const review = findReview(quote.id)}
-          <div class="surveyor-card">
+          {@const currentWorkStatus = review?.workStatus || 'not started'}
+          <div 
+            class="surveyor-card"
+            class:card-completed={currentWorkStatus === 'completed'}
+          >
             <div class="card-header">
               <h3>{quote.organisation}</h3>
-              <span class="status-badge status-instructed">
-                Instructed
-              </span>
+              <!-- Dropdown styled as pill -->
+              <div class="status-dropdown-container">
+                 <select 
+                    class="work-status-select {currentWorkStatus.replace(/\s+/g, '-')}" 
+                    value={currentWorkStatus} 
+                    on:change={(e) => handleWorkStatusChange(quote.id, e.currentTarget.value as WorkStatus)}
+                  >
+                    {#each workStatuses as status}
+                      <option value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </option>
+                    {/each}
+                 </select>
+              </div>
             </div>
             
             <div class="card-content">
@@ -170,6 +197,12 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: background-color 0.3s ease;
+  }
+  
+  .surveyor-card.card-completed {
+    background-color: #e6f7ec;
+    border-left: 5px solid #28a745;
   }
   
   .card-header {
@@ -189,17 +222,11 @@
   }
   
   .status-badge {
-    display: inline-block;
-    padding: 0.3rem 0.6rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: capitalize;
+    /* Removed as it was specific to the old static badge */
   }
   
   .status-instructed {
-    background-color: #28a745;
-    color: white;
+    /* Removed as it was specific to the old static badge */
   }
   
   .card-content {
@@ -306,5 +333,51 @@
     border: 1px dashed #ced4da;
     border-radius: 5px;
     margin-top: 1rem;
+  }
+  
+  .status-dropdown-container {
+    position: relative; /* Allows absolute positioning of arrow */
+  }
+
+  .work-status-select {
+      /* Appearance reset */
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      /* Pill styling */
+      display: inline-block;
+      padding: 0.3rem 1.5rem 0.3rem 0.8rem; /* Extra padding right for arrow space */
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-transform: capitalize;
+      border: none; 
+      cursor: pointer;
+      line-height: 1.2;
+      /* Default state */
+      background-color: #6c757d; /* Default grey */
+      color: white;
+      min-width: 110px; /* Ensure minimum width */
+      text-align: center;
+      background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 0.3rem center;
+      background-size: 1.1em;
+  }
+  
+  /* Color overrides based on status */
+  .work-status-select.not-started {
+      background-color: #6c757d; /* Grey */
+  }
+  .work-status-select.in-progress {
+      background-color: #007bff; /* Blue */
+  }
+  .work-status-select.completed {
+      background-color: #28a745; /* Green */
+  }
+
+  .work-status-select:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
   }
 </style> 

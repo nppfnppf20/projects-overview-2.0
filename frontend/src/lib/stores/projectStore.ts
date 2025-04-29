@@ -211,7 +211,6 @@ export function updateQuoteInstructionStatus(quoteId: string, newStatus: Instruc
   );
 }
 
-// Function to potentially update other quote details later (e.g., from an edit modal)
 export function updateQuote(quoteId: string, updatedData: Partial<Quote>) {
   allQuotes.update(quotes => 
     quotes.map(quote => 
@@ -220,7 +219,14 @@ export function updateQuote(quoteId: string, updatedData: Partial<Quote>) {
   );
 }
 
+export function deleteQuote(quoteId: string) {
+  allQuotes.update(quotes => quotes.filter(quote => quote.id !== quoteId));
+  // In a real app, you would also need to delete related reviews, etc.
+}
+
 // --- Review Interface and Store ---
+export type WorkStatus = 'in progress' | 'completed' | 'not started';
+
 export interface SurveyorReview {
   id: string; 
   projectId: string; 
@@ -231,8 +237,9 @@ export interface SurveyorReview {
   overallReview: number; // 1-5
   notes?: string; 
   reviewDate: string; 
-  siteVisitDate?: string; // New: Date of site visit
-  reportDraftDate?: string; // New: Date report draft due/received
+  siteVisitDate?: string; 
+  reportDraftDate?: string; 
+  workStatus?: WorkStatus; // New: Track work progress
 }
 
 // Store for all reviews
@@ -247,8 +254,9 @@ const initialReviews: SurveyorReview[] = [
         overallReview: 4, 
         notes: 'Very professional and delivered on time.', 
         reviewDate: '2023-08-01',
-        siteVisitDate: '2023-07-10', // Example data
-        reportDraftDate: '2023-07-25' // Example data
+        siteVisitDate: '2023-07-10', 
+        reportDraftDate: '2023-07-25', 
+        workStatus: 'completed' // Example initial work status
     }
 ];
 
@@ -257,31 +265,39 @@ export const allReviews = writable<SurveyorReview[]>(initialReviews);
 export function addOrUpdateReview(reviewData: Omit<SurveyorReview, 'id'> & { id?: string }) {
     allReviews.update(reviews => {
         const existingReviewIndex = reviews.findIndex(r => r.quoteId === reviewData.quoteId);
+        const now = new Date().toISOString().split('T')[0];
         
         if (existingReviewIndex !== -1) {
             // Update existing review
+            const currentReview = reviews[existingReviewIndex];
             const updatedReview = { 
-                ...reviews[existingReviewIndex], 
-                ...reviewData 
+                ...currentReview, 
+                ...reviewData,
+                reviewDate: currentReview.reviewDate || now // Keep original review date if exists
             };
-            // Ensure ratings are within bounds (0-5)
+            // Ensure ratings are within bounds
             updatedReview.quality = Math.max(0, Math.min(5, updatedReview.quality || 0));
             updatedReview.responsiveness = Math.max(0, Math.min(5, updatedReview.responsiveness || 0));
             updatedReview.deliveredOnTime = Math.max(0, Math.min(5, updatedReview.deliveredOnTime || 0));
-            updatedReview.overallReview = Math.max(1, Math.min(5, updatedReview.overallReview)); // Overall must be 1-5
+            updatedReview.overallReview = Math.max(0, Math.min(5, updatedReview.overallReview || 0)); // Allow 0 if not set
             
             reviews[existingReviewIndex] = updatedReview;
             return [...reviews];
         } else {
             // Add new review, ensuring values are within bounds
             const newReview: SurveyorReview = {
-                ...reviewData,
                 id: `rev${Date.now()}`,
+                projectId: reviewData.projectId,
+                quoteId: reviewData.quoteId,
                 quality: Math.max(0, Math.min(5, reviewData.quality || 0)),
                 responsiveness: Math.max(0, Math.min(5, reviewData.responsiveness || 0)),
                 deliveredOnTime: Math.max(0, Math.min(5, reviewData.deliveredOnTime || 0)),
-                overallReview: Math.max(1, Math.min(5, reviewData.overallReview || 1)), // Default to 1 if not provided
-                notes: reviewData.notes || ''
+                overallReview: Math.max(0, Math.min(5, reviewData.overallReview || 0)), // Allow 0
+                notes: reviewData.notes || '',
+                reviewDate: reviewData.reviewDate || now,
+                siteVisitDate: reviewData.siteVisitDate,
+                reportDraftDate: reviewData.reportDraftDate,
+                workStatus: reviewData.workStatus || 'not started' // Default work status
             };
             return [...reviews, newReview];
         }
@@ -294,6 +310,30 @@ export function getReviewForQuote(quoteId: string): SurveyorReview | undefined {
         review = reviews.find(r => r.quoteId === quoteId);
     })(); // Immediately unsubscribe
     return review;
+}
+
+// Specific function to update only the work status
+export function updateWorkStatus(quoteId: string, projectId: string, workStatus: WorkStatus) {
+    const existingReview = getReviewForQuote(quoteId);
+    const reviewData: Omit<SurveyorReview, 'id'> & { id?: string } = {
+        quoteId: quoteId,
+        projectId: projectId,
+        workStatus: workStatus,
+        // Provide defaults or existing values for other fields if review doesn't exist
+        overallReview: existingReview?.overallReview ?? 0,
+        reviewDate: existingReview?.reviewDate ?? new Date().toISOString().split('T')[0],
+        // Include other existing fields
+        ...(existingReview ? { 
+            quality: existingReview.quality,
+            responsiveness: existingReview.responsiveness,
+            deliveredOnTime: existingReview.deliveredOnTime,
+            notes: existingReview.notes,
+            siteVisitDate: existingReview.siteVisitDate,
+            reportDraftDate: existingReview.reportDraftDate,
+            id: existingReview.id // Pass ID if updating existing
+         } : {})
+    };
+    addOrUpdateReview(reviewData);
 }
 
 // --- Programme Event Interface and Store ---
