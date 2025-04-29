@@ -227,10 +227,12 @@ export interface SurveyorReview {
   quoteId: string; 
   quality?: number; // 1-5
   responsiveness?: number; // 1-5
-  deliveredOnTime?: number; // Changed to number 0-5
+  deliveredOnTime?: number; // 0-5
   overallReview: number; // 1-5
   notes?: string; 
   reviewDate: string; 
+  siteVisitDate?: string; // New: Date of site visit
+  reportDraftDate?: string; // New: Date report draft due/received
 }
 
 // Store for all reviews
@@ -241,10 +243,12 @@ const initialReviews: SurveyorReview[] = [
         quoteId: 'q2', 
         quality: 5,
         responsiveness: 4,
-        deliveredOnTime: 5, // Changed to numeric rating
+        deliveredOnTime: 5, 
         overallReview: 4, 
         notes: 'Very professional and delivered on time.', 
-        reviewDate: '2023-08-01'
+        reviewDate: '2023-08-01',
+        siteVisitDate: '2023-07-10', // Example data
+        reportDraftDate: '2023-07-25' // Example data
     }
 ];
 
@@ -290,4 +294,62 @@ export function getReviewForQuote(quoteId: string): SurveyorReview | undefined {
         review = reviews.find(r => r.quoteId === quoteId);
     })(); // Immediately unsubscribe
     return review;
+}
+
+// --- Programme Event Interface and Store ---
+export interface ProgrammeEvent {
+  id: string; // Unique event ID (e.g., `evt-${Date.now()}`)
+  projectId: string; // Link to project
+  title: string; // Description of the key date
+  date: string; // ISO date string (YYYY-MM-DD)
+  color: string; // Hex color code (e.g., #ff0000)
+}
+
+// Store for all programme events
+const initialProgrammeEvents: ProgrammeEvent[] = [
+    // Add initial dummy events if needed, linking to projectIds
+    {
+        id: 'evt1',
+        projectId: 'project-1',
+        title: 'Initial Site Assessment Due',
+        date: '2023-11-15', // Example date - adjust if needed
+        color: '#007bff' // Blue
+    },
+    {
+        id: 'evt2',
+        projectId: 'project-1',
+        title: 'Planning Submission Target',
+        date: '2023-11-30',
+        color: '#ffc107' // Yellow
+    },
+     {
+        id: 'evt3',
+        projectId: 'project-2',
+        title: 'Grid Connection Offer Deadline',
+        date: '2023-12-10',
+        color: '#dc3545' // Red
+    }
+];
+
+export const allProgrammeEvents = writable<ProgrammeEvent[]>(initialProgrammeEvents);
+
+export function addProgrammeEvent(eventData: Omit<ProgrammeEvent, 'id'>) {
+  const newEvent: ProgrammeEvent = {
+    ...eventData,
+    id: `evt-${Date.now()}`
+  };
+  allProgrammeEvents.update(events => [...events, newEvent]);
+}
+
+// Optional: Add update/delete functions later if needed
+export function updateProgrammeEvent(eventId: string, updatedData: Partial<ProgrammeEvent>) {
+     allProgrammeEvents.update(events => 
+        events.map(event => 
+            event.id === eventId ? { ...event, ...updatedData } : event
+        )
+    );
+}
+
+export function deleteProgrammeEvent(eventId: string) {
+    allProgrammeEvents.update(events => events.filter(event => event.id !== eventId));
 } 

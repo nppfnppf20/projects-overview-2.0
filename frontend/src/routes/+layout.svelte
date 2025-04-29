@@ -2,6 +2,9 @@
     import ProjectSelector from "$lib/components/ProjectSelector.svelte";
     import TabNav from "$lib/components/TabNav.svelte";
     import { selectedProject } from "$lib/stores/projectStore";
+
+    // Removed FullCalendar CSS imports from here
+
 </script>
 
 <div class="app">

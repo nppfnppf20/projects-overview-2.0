@@ -1,14 +1,14 @@
 <script lang="ts">
   import { page } from '$app/stores';
   
-  // Define our tabs
+  // Define our tabs in the desired order
   const tabs = [
     { id: 'general', label: 'General Project Information', path: '/' },
+    { id: 'documents', label: 'Relevant Documents', path: '/documents' },
     { id: 'quotes', label: 'Surveyor Quotes', path: '/quotes' },
     { id: 'instructed', label: 'Instructed Surveyors', path: '/instructed' },
-    { id: 'reviews', label: 'Surveyor Reviews', path: '/reviews' },
     { id: 'programme', label: 'Programme', path: '/programme' },
-    { id: 'documents', label: 'Relevant Documents', path: '/documents' }
+    { id: 'reviews', label: 'Surveyor Reviews', path: '/reviews' },
   ];
 </script>
 
@@ -42,12 +42,15 @@
   }
 
   a {
-    display: block;
+    display: flex;
+    align-items: center;
+    min-height: 4em;
     padding: 0.75rem 1.25rem;
     text-decoration: none;
     color: #495057;
     border-bottom: 3px solid transparent;
     transition: all 0.2s ease;
+    box-sizing: border-box;
   }
 
   a:hover {
