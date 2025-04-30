@@ -3,6 +3,7 @@
     selectedProject, 
     allQuotes, 
     addQuote as addQuoteToStore, 
+    updateQuote,
     updateQuoteInstructionStatus, 
     deleteQuote,
     type InstructionStatus, 
@@ -21,75 +22,90 @@
   
   // State for new quote modal
   let showNewQuoteModal = false;
+  let isEditing = false;
+  let quoteToEditId: string | null = null;
   
-  // New quote data structure (matching store, excluding fields generated on add)
-  let newQuoteForm = {
-    discipline: '',
-    surveyType: '',
-    organisation: '',
-    contactName: '',
-    email: '',
-    lineItems: [] as LineItem[],
-    additionalNotes: '',
-    instructionStatus: 'not instructed' as InstructionStatus, // Set default
-    status: 'pending' as string, // Set default internal status
-    date: new Date().toISOString().split('T')[0] // Set default date
-  };
-  
-  // For line item input
-  let currentLineItem: LineItem = {
-    description: '',
-    cost: 0
-  };
+  // Function to create a blank line item object
+  function createNewLineItem(): LineItem {
+    return { description: '', cost: 0 };
+  }
+
+  // Function to create the initial empty form state
+  function createInitialFormState() {
+    return {
+      discipline: '',
+      surveyType: '',
+      organisation: '',
+      contactName: '',
+      email: '',
+      lineItems: [createNewLineItem()] as LineItem[],
+      additionalNotes: '',
+      instructionStatus: 'not instructed' as InstructionStatus,
+      status: 'pending' as string,
+      date: new Date().toISOString().split('T')[0]
+    };
+  }
+
+  // New quote/edit quote form data
+  let newQuoteForm = createInitialFormState();
   
   // State for viewing line items modal
   let showLineItemsModal = false;
   let selectedQuoteForLineItems: Quote | null = null;
   
   function openNewQuoteModal() {
+    resetNewQuoteForm();
+    isEditing = false;
+    quoteToEditId = null;
+    showNewQuoteModal = true;
+  }
+  
+  function openEditQuoteModal(quote: Quote) {
+    isEditing = true;
+    quoteToEditId = quote.id;
+    newQuoteForm = {
+        ...createInitialFormState(),
+        discipline: quote.discipline,
+        surveyType: quote.surveyType || '', 
+        organisation: quote.organisation,
+        contactName: quote.contactName,
+        email: quote.email || '', 
+        lineItems: quote.lineItems.map(item => ({ ...item })),
+        additionalNotes: quote.additionalNotes || '', 
+        instructionStatus: quote.instructionStatus,
+        status: quote.status || 'pending',
+        date: quote.date || new Date().toISOString().split('T')[0]
+    };
+    if (newQuoteForm.lineItems.length === 0) {
+        newQuoteForm.lineItems = [createNewLineItem()];
+    }
     showNewQuoteModal = true;
   }
   
   function resetNewQuoteForm() {
-    newQuoteForm = {
-      discipline: '',
-      surveyType: '',
-      organisation: '',
-      contactName: '',
-      email: '',
-      lineItems: [] as LineItem[],
-      additionalNotes: '',
-      instructionStatus: 'not instructed' as InstructionStatus,
-      status: 'pending' as string,
-      date: new Date().toISOString().split('T')[0]
-    };
-    currentLineItem = {
-      description: '',
-      cost: 0
-    };
+    newQuoteForm = createInitialFormState();
   }
   
   function closeNewQuoteModal() {
     showNewQuoteModal = false;
+    isEditing = false;
+    quoteToEditId = null;
     resetNewQuoteForm();
   }
   
   function addLineItem() {
-    if (currentLineItem.description.trim() && currentLineItem.cost >= 0) {
-      newQuoteForm.lineItems = [...newQuoteForm.lineItems, { ...currentLineItem }];
-      // Reset current line item
-      currentLineItem = {
-        description: '',
-        cost: 0
-      };
-    }
+    newQuoteForm.lineItems = [...newQuoteForm.lineItems, createNewLineItem()];
   }
   
   function removeLineItem(index: number) {
-    newQuoteForm.lineItems = newQuoteForm.lineItems.filter((_, i) => i !== index);
+    if (newQuoteForm.lineItems.length > 1) {
+        newQuoteForm.lineItems = newQuoteForm.lineItems.filter((_, i) => i !== index);
+    } else {
+        newQuoteForm.lineItems[0] = createNewLineItem();
+    }
   }
   
-  function submitNewQuote() {
+  function submitQuote() {
     if (!$selectedProject) {
       alert('Please select a project first.');
       return;
@@ -100,32 +116,53 @@
       return;
     }
     
-    // Prepare data for the store function
-    const quoteDataForStore = {
-      ...newQuoteForm,
-      projectId: $selectedProject.id // Add the project ID
+    const validLineItems = newQuoteForm.lineItems.filter(item => item.description.trim() !== '');
+
+    if (validLineItems.length === 0 && !isEditing) {
+        alert('Please add at least one valid line item with a description.');
+        return;
+    }
+    
+    const total = validLineItems.reduce((sum, item) => sum + (item.cost || 0), 0);
+
+    const quoteDataForStore: Partial<Quote> = {
+      discipline: newQuoteForm.discipline,
+      surveyType: newQuoteForm.surveyType,
+      organisation: newQuoteForm.organisation,
+      contactName: newQuoteForm.contactName,
+      email: newQuoteForm.email,
+      lineItems: validLineItems,
+      additionalNotes: newQuoteForm.additionalNotes,
+      instructionStatus: newQuoteForm.instructionStatus,
+      status: newQuoteForm.status,
+      date: newQuoteForm.date,
+      total: total
     };
+
+    if (isEditing && quoteToEditId) {
+      updateQuote(quoteToEditId, quoteDataForStore);
+    } else {
+      addQuoteToStore({ 
+          ...quoteDataForStore, 
+          projectId: $selectedProject.id 
+      } as Omit<Quote, 'id' | 'total'> & { total: number });
+    }
     
-    addQuoteToStore(quoteDataForStore);
-    
-    // Close modal and reset
     closeNewQuoteModal();
   }
   
   function handleStatusChange(quoteId: string, newStatus: InstructionStatus) {
       updateQuoteInstructionStatus(quoteId, newStatus);
-      // Optionally add feedback like a toast message
   }
   
   function handleDeleteQuote(quoteId: string, organisationName: string) {
     if (confirm(`Are you sure you want to delete the quote from ${organisationName}? This cannot be undone.`)) {
       deleteQuote(quoteId);
-      // Note: Related reviews are not automatically deleted by this action yet.
     }
   }
   
-  // Calculate total for new quote
-  $: newQuoteTotal = newQuoteForm.lineItems.reduce((sum, item) => sum + item.cost, 0);
+  // Calculate total for new quote (now iterates through the array directly)
+  $: newQuoteTotal = newQuoteForm.lineItems.reduce((sum, item) => sum + (item.cost || 0), 0);
   
   // Filter quotes based on selected project
   $: filteredQuotes = $selectedProject 
@@ -208,7 +245,11 @@
                   title="Delete Quote" 
                   on:click={() => handleDeleteQuote(quote.id, quote.organisation)}
                 >Delete</button>
-                <button class="action-btn edit-btn" title="Edit Quote">Edit</button>
+                <button 
+                  class="action-btn edit-btn" 
+                  title="Edit Quote"
+                  on:click={() => openEditQuoteModal(quote)} 
+                >Edit</button>
               </td>
               <td class="action-cell icon-cell">
                 <button class="action-btn icon-btn" title="Manage Quote Documents (TBD)">📎</button>
@@ -230,7 +271,7 @@
     <div class="modal-overlay">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Add New Quote</h2>
+          <h2>{isEditing ? 'Edit Quote' : 'Add New Quote'}</h2>
           <button class="close-btn" on:click={closeNewQuoteModal}>×</button>
         </div>
         
@@ -268,45 +309,38 @@
           
           <h3>Line Items</h3>
           
-          {#if newQuoteForm.lineItems.length > 0}
-            <div class="line-items-list">
-              {#each newQuoteForm.lineItems as item, index}
-                <div class="line-item">
-                  <div class="line-item-details">
-                    <span class="line-item-desc">{item.description}</span>
-                    <span class="line-item-cost">£{item.cost.toFixed(2)}</span>
-                  </div>
-                  <button class="remove-line-item" on:click={() => removeLineItem(index)}>×</button>
-                </div>
-              {/each}
-            </div>
-          {/if}
-          
-          <div class="add-line-item-container">
-            <div class="line-item-form">
-              <input type="text" placeholder="Description" bind:value={currentLineItem.description} />
-              <div class="cost-input-wrapper">
-                <label class="cost-label">£ (excl. VAT)</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  bind:value={currentLineItem.cost} 
-                  min="0" 
-                  step="0.01"
-                  class="cost-input"
-                />
+          <div class="line-items-input-area">
+            {#each newQuoteForm.lineItems as item, index (index)}
+              <div class="line-item-input-row">
+                 <div class="line-item-inputs">
+                    <input 
+                      type="text" 
+                      placeholder="Description" 
+                      bind:value={item.description} 
+                      class="line-item-desc-input"
+                    />
+                    <div class="cost-input-wrapper">
+                      <label class="cost-label">£ (excl. VAT)</label>
+                      <input 
+                        type="number" 
+                        placeholder="0" 
+                        bind:value={item.cost} 
+                        min="0" 
+                        step="0.01"
+                        class="cost-input"
+                      />
+                    </div>
+                 </div>
+                 <button 
+                    class="remove-line-item-btn" 
+                    title="Remove Line Item"
+                    on:click={() => removeLineItem(index)}
+                 >×</button>
               </div>
-              <button 
-                class="delete-line-item-btn" 
-                title="Clear"
-                on:click={() => {
-                  currentLineItem.description = '';
-                  currentLineItem.cost = 0;
-                }}
-              >×</button>
-            </div>
-            <button class="add-line-item-btn" on:click={addLineItem}>+ Add Line Item</button>
+            {/each}
           </div>
+
+          <button class="add-line-item-btn" on:click={addLineItem}>+ Add New Line Item</button>
           
           <div class="total-container">
             <span class="total-label">Total: £{newQuoteTotal.toFixed(2)}</span>
@@ -322,7 +356,9 @@
         
         <div class="modal-footer">
           <button class="cancel-btn" on:click={closeNewQuoteModal}>Cancel</button>
-          <button class="submit-btn" on:click={submitNewQuote}>Add Quote</button>
+          <button class="submit-btn" on:click={submitQuote}>
+            {isEditing ? 'Update Quote' : 'Add Quote'}
+          </button>
         </div>
       </div>
     </div>
@@ -359,20 +395,6 @@
     font-size: 1.5rem;
     color: #555;
     margin: 0;
-  }
-  
-  .add-quote-btn {
-    background-color: #28a745;
-    color: white;
-    padding: 0.6rem 1.2rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-  }
-  
-  .add-quote-btn:hover {
-    background-color: #218838;
   }
   
   .quotes-table-container {
@@ -602,26 +624,35 @@
     margin-bottom: 1rem;
   }
   
-  .add-line-item-container {
-    margin-bottom: 1.5rem;
+  .line-items-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
   }
   
-  .line-item-form {
+  .line-item-input-row {
     display: flex;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
+    gap: 0.75rem;
     align-items: flex-end;
   }
   
-  .line-item-form input[type="text"] {
-    flex: 1;
-    height: 38px;
+  .line-item-inputs {
+     display: flex;
+     gap: 1rem;
+     flex-grow: 1;
+     align-items: flex-end;
+  }
+  
+  .line-item-desc-input {
+     flex: 1;
+     height: 38px;
   }
   
   .cost-input-wrapper {
     display: flex;
     flex-direction: column;
-    width: 220px;
+    width: 200px;
   }
   
   .cost-label {
@@ -638,17 +669,12 @@
     padding: 0.5rem;
   }
   
-  .cost-input:focus {
-    outline: none;
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-  }
-  
-  .delete-line-item-btn {
+  .remove-line-item-btn {
     background: none;
     border: 1px solid #ced4da;
     color: #dc3545;
     font-size: 1.25rem;
+    font-weight: bold;
     cursor: pointer;
     padding: 0;
     width: 38px;
@@ -657,60 +683,34 @@
     align-items: center;
     justify-content: center;
     border-radius: 4px;
+    flex-shrink: 0;
+    transition: background-color 0.2s, color 0.2s;
   }
   
-  .delete-line-item-btn:hover {
-    background-color: #f8f9fa;
+  .remove-line-item-btn:hover {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
   }
   
   .add-line-item-btn {
     background: none;
-    border: 1px dashed #ced4da;
-    color: #6c757d;
+    border: 1px dashed #007bff;
+    color: #007bff;
     padding: 0.5rem 1rem;
     border-radius: 4px;
     cursor: pointer;
     width: 100%;
     text-align: center;
     transition: all 0.2s;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
   }
   
   .add-line-item-btn:hover {
-    background-color: #f8f9fa;
-    color: #495057;
-  }
-  
-  .line-items-list {
-    margin-bottom: 1rem;
-  }
-  
-  .line-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
-    background-color: #f8f9fa;
-    margin-bottom: 0.5rem;
-    border-radius: 4px;
-  }
-  
-  .line-item-details {
-    display: flex;
-    justify-content: space-between;
-    flex: 1;
-    margin-right: 1rem;
-  }
-  
-  .line-item-cost {
-    font-weight: 500;
-  }
-  
-  .remove-line-item {
-    background: none;
-    border: none;
-    color: #dc3545;
-    cursor: pointer;
-    font-size: 1.25rem;
+    background-color: rgba(0, 123, 255, 0.1);
+    color: #0056b3;
+    border-style: solid;
   }
   
   .total-container {
@@ -757,8 +757,8 @@
       border: none;
       padding: 0.2rem 0.5rem;
       cursor: pointer;
-      font-size: 0.95rem; /* Match table text */
-      color: #007bff; /* Make it look clickable */
+      font-size: 0.95rem;
+      color: #007bff;
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
@@ -772,7 +772,7 @@
 
   .plus-sign {
       font-weight: bold;
-      font-size: 1.1em; /* Slightly larger plus */
+      font-size: 1.1em;
       line-height: 1;
   }
 
@@ -788,14 +788,28 @@
   .icon-btn {
       background: none;
       border: none;
-      font-size: 1.3rem; /* Larger icon size */
+      font-size: 1.3rem;
       cursor: pointer;
-      color: #6c757d; /* Grey color */
+      color: #6c757d;
       padding: 0.2rem;
       line-height: 1;
   }
   
   .icon-btn:hover {
       color: #343a40;
+  }
+
+  .add-quote-btn {
+    background-color: #28a745;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  .add-quote-btn:hover {
+    background-color: #218838;
   }
 </style> 
