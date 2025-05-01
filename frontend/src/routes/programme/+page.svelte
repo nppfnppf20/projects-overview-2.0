@@ -79,6 +79,20 @@
     }
   );
 
+  // NEW: Filtered Key Dates for Timeline
+  const timelineKeyDates = derived(
+      [allProgrammeEvents, selectedProject],
+      ([$allEvents, $project]) => {
+          if (!$project) return [];
+          return $allEvents
+              .filter(event => event.projectId === $project.id)
+              .map(event => ({
+                  ...event,
+                  parsedDate: parseISO(event.date) // Ensure date is parsed
+              }));
+      }
+  );
+
   // NEW: Timeline Data - Instructed Surveyors with Dates
   const instructedSurveyorTimelineData = derived(
       [allQuotes, allReviews, selectedProject],
@@ -326,6 +340,28 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                <!-- NEW: Key Dates Row -->
+                                <tr>
+                                    <td class="td-sticky key-dates-header">Key Dates</td>
+                                    {#each $timelineWeeks as weekStartDate (weekStartDate.toISOString())}
+                                        <td>
+                                            <div class="timeline-markers">
+                                                 {#each $timelineKeyDates as keyEvent (keyEvent.id)}
+                                                    {#if isDateInWeek(keyEvent.parsedDate, weekStartDate)}
+                                                         <div 
+                                                            class="marker key-date" 
+                                                            style="background-color: {keyEvent.color || '#6c757d'};" 
+                                                            title="{keyEvent.title}: {format(keyEvent.parsedDate, 'dd MMM yyyy')}"
+                                                        >
+                                                            {keyEvent.title.substring(0, 2).toUpperCase()} 
+                                                        </div>
+                                                    {/if}
+                                                 {/each}
+                                            </div>
+                                        </td>
+                                    {/each}
+                                </tr>
+                                <!-- Existing Surveyor Rows -->
                                 {#each $instructedSurveyorTimelineData as surveyor (surveyor.id)}
                                     <tr>
                                         <td class="td-sticky">{surveyor.organisation}</td>
@@ -697,6 +733,18 @@
       font-size: 0.75rem;
       font-weight: bold;
       cursor: default; /* Indicate it's not clickable (yet) */
+  }
+
+  /* NEW: Style for Key Date markers (uses inline style for background) */
+  .marker.key-date {
+      /* Default background if color not provided */
+      background-color: #6c757d; 
+  }
+  
+  /* NEW: Style for the sticky header cell of the Key Dates row */
+  .td-sticky.key-dates-header {
+       font-weight: 600; /* Make it bold like other headers */
+       background-color: #f8f9fa; /* Match header background */
   }
 
   .site-visit {
