@@ -104,7 +104,13 @@
                   {/if}
                 </td>
                 <td>{quote.surveyType || 'N/A'}</td>
-                <td>£{quote.total.toFixed(2)}</td>
+                <td>
+                  {#if quote.instructionStatus === 'partially instructed' && quote.partiallyInstructedTotal !== undefined}
+                    £{quote.partiallyInstructedTotal.toFixed(2)} (Partial)
+                  {:else}
+                    £{quote.total.toFixed(2)}
+                  {/if}
+                </td>
                 <td>
                   <div class="status-dropdown-container">
                      <select

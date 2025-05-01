@@ -127,7 +127,7 @@ export interface LineItem {
   cost: number;
 }
 
-export type InstructionStatus = 'pending' | 'not instructed' | 'partially instructed' | 'instructed';
+export type InstructionStatus = 'pending' | 'will not be instructed' | 'partially instructed' | 'instructed';
 
 export interface Quote {
   id: string;
@@ -140,6 +140,7 @@ export interface Quote {
   lineItems: LineItem[]; // Store full line items
   total: number;
   instructionStatus: InstructionStatus;
+  partiallyInstructedTotal?: number; // New: Store total if partially instructed
   additionalNotes?: string; // Added from modal
   status?: string; // Internal status, maybe useful later
   date?: string; // Optional date field
@@ -156,7 +157,7 @@ const initialQuotes: Quote[] = [
     email: 'john.smith@ecosurveys.com',
     lineItems: [{description: 'Desk Study', cost: 400}, {description: 'Site Visit', cost: 600}, {description: 'Report', cost: 200}],
     total: 1200,
-    instructionStatus: 'not instructed', 
+    instructionStatus: 'will not be instructed', 
     status: 'pending',
     date: '2023-05-15' 
   },
@@ -203,11 +204,20 @@ export function addQuote(quoteData: Omit<Quote, 'id' | 'total'>) {
   allQuotes.update(quotes => [...quotes, newQuote]);
 }
 
-export function updateQuoteInstructionStatus(quoteId: string, newStatus: InstructionStatus) {
+export function updateQuoteInstructionStatus(quoteId: string, newStatus: InstructionStatus, partialTotal?: number) {
   allQuotes.update(quotes => 
-    quotes.map(quote => 
-      quote.id === quoteId ? { ...quote, instructionStatus: newStatus } : quote
-    )
+    quotes.map(quote => {
+      if (quote.id === quoteId) {
+        const updatedQuote = { 
+          ...quote, 
+          instructionStatus: newStatus,
+          // Set or clear the partial total based on the new status
+          partiallyInstructedTotal: newStatus === 'partially instructed' ? partialTotal : undefined
+        };
+        return updatedQuote;
+      } 
+      return quote;
+    })
   );
 }
 

@@ -16,7 +16,7 @@
   // Instruction status options for dropdown (can be imported or defined here)
   const instructionStatuses: InstructionStatus[] = [
     'pending', 
-    'not instructed', 
+    'will not be instructed',
     'partially instructed', 
     'instructed'
   ];
@@ -41,7 +41,7 @@
       email: '',
       lineItems: [createNewLineItem()] as LineItem[],
       additionalNotes: '',
-      instructionStatus: 'not instructed' as InstructionStatus,
+      instructionStatus: 'will not be instructed' as InstructionStatus,
       status: 'pending' as string,
       date: new Date().toISOString().split('T')[0]
     };
@@ -158,14 +158,13 @@
   }
   
   function handleStatusChange(quoteId: string, newStatus: InstructionStatus, currentQuote: Quote) {
-      const originalStatus = currentQuote.instructionStatus;
-
       if (newStatus === 'partially instructed') {
           quoteForPartialInstruction = currentQuote;
           currentlySelectedStatus = newStatus; 
           showPartiallyInstructedModal = true;
       } else {
-          updateQuoteInstructionStatus(quoteId, newStatus);
+          // Pass undefined for partialTotal to clear it if necessary
+          updateQuoteInstructionStatus(quoteId, newStatus, undefined);
       }
   }
   
@@ -197,9 +196,11 @@
   // Functions for Partially Instructed Modal
   function handlePartialInstructionConfirm(event: CustomEvent<{ selectedItems: LineItem[] }>) {
       const selectedItems = event.detail.selectedItems;
-      if (quoteForPartialInstruction && currentlySelectedStatus) {
-          console.log("Selected partial items:", selectedItems);
-          updateQuoteInstructionStatus(quoteForPartialInstruction.id, currentlySelectedStatus);
+      if (quoteForPartialInstruction && currentlySelectedStatus === 'partially instructed') {
+          const partialTotal = selectedItems.reduce((sum, item) => sum + (item.cost || 0), 0);
+          console.log("Selected partial items:", selectedItems, "Total:", partialTotal);
+          // Pass the calculated partial total
+          updateQuoteInstructionStatus(quoteForPartialInstruction.id, currentlySelectedStatus, partialTotal);
       }
       closePartiallyInstructedModal();
   }
@@ -266,7 +267,11 @@
               <td class="text-right">£{quote.total.toFixed(2)}</td>
               <td>
                 <select 
-                  class="instruction-status-select" 
+                  class="instruction-status-select"
+                  class:status-instructed={quote.instructionStatus === 'instructed'}
+                  class:status-partially-instructed={quote.instructionStatus === 'partially instructed'}
+                  class:status-pending={quote.instructionStatus === 'pending'}
+                  class:status-will-not-be-instructed={quote.instructionStatus === 'will not be instructed'}
                   value={quote.instructionStatus}
                   on:change={(e) => handleStatusChange(quote.id, e.currentTarget.value as InstructionStatus, quote)}
                 >
@@ -553,18 +558,49 @@
   
   /* Styling for the new instruction status dropdown */
   .instruction-status-select {
-    padding: 0.4rem 0.6rem;
+    padding: 0.4rem 1.8rem 0.4rem 0.8rem;
     border: 1px solid #ced4da;
-    border-radius: 4px;
+    border-radius: 20px;
     font-size: 0.9rem;
     background-color: white;
-    min-width: 150px; /* Adjust as needed */
+    min-width: 150px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236c757d'%3E%3Cpath fill-rule='evenodd' d='M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1em 1em;
   }
   
   .instruction-status-select:focus {
     outline: none;
     border-color: #80bdff;
     box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25);
+  }
+  
+  /* Status Color Coding */
+  .instruction-status-select.status-instructed,
+  .instruction-status-select.status-partially-instructed {
+    background-color: #d4edda; /* Light green */
+    color: #155724; /* Dark green text */
+    border-color: #c3e6cb;
+    /* Keep custom arrow, changing its color */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23155724'%3E%3Cpath fill-rule='evenodd' d='M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z'/%3E%3C/svg%3E");
+  }
+  
+  .instruction-status-select.status-pending {
+    background-color: #fff3cd; /* Light orange/yellow */
+    color: #856404; /* Dark orange/yellow text */
+    border-color: #ffeeba;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23856404'%3E%3Cpath fill-rule='evenodd' d='M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z'/%3E%3C/svg%3E");
+  }
+  
+  .instruction-status-select.status-will-not-be-instructed {
+    background-color: #f8d7da; /* Light red */
+    color: #721c24; /* Dark red text */
+    border-color: #f5c6cb;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23721c24'%3E%3Cpath fill-rule='evenodd' d='M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z'/%3E%3C/svg%3E");
   }
   
   /* Modal Styles */
