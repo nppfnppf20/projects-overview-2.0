@@ -10,11 +10,16 @@
     type WorkStatus // Import the status type
   } from "$lib/stores/projectStore";
   import NotesModal from "$lib/components/NotesModal.svelte"; // Import the new modal
+  import DocumentUploadModal from "$lib/components/DocumentUploadModal.svelte"; // Import the document upload modal
   
   // Modal state for Notes
   let showNotesModal = false;
   let currentQuoteForNotes: Quote | null = null;
   let currentNotes: string | undefined = '';
+
+  // Modal state for Document Upload
+  let showDocumentUploadModal = false;
+  let currentQuoteForUpload: Quote | null = null;
 
   // Filter for instructed quotes based on selected project
   $: instructedQuotes = $selectedProject 
@@ -108,6 +113,24 @@
     closeNotesModal();
   }
 
+  // --- Document Upload Modal Functions ---
+  function openDocumentUploadModal(quote: Quote) {
+    currentQuoteForUpload = quote;
+    showDocumentUploadModal = true;
+  }
+
+  function closeDocumentUploadModal() {
+    showDocumentUploadModal = false;
+    currentQuoteForUpload = null;
+  }
+
+  function handleDocumentUploadComplete(event: CustomEvent<{ quoteId: string, documentType: string, fileName: string }>) {
+    console.log('Upload complete:', event.detail);
+    // Here you would typically update the UI or state to reflect the new document
+    // For now, we just log it.
+    closeDocumentUploadModal(); // Close modal on successful upload
+  }
+
   // Helper function to get the first line of notes or a placeholder
   function getNotesPreview(notes: string | undefined): string {
     if (!notes || notes.trim() === '') {
@@ -137,8 +160,9 @@
               <th>Quote Amt.</th>
               <th>Work Status</th>
               <th>Site Visit</th>
-              <th>Report Draft</th>
+              <th>Draft Report Due</th>
               <th>Notes</th>
+              <th>Completed Works</th>
             </tr>
           </thead>
           <tbody>
@@ -207,6 +231,15 @@
                     {getNotesPreview(review?.notes)}
                   </div>
                 </td>
+                <td>
+                  <button 
+                    class="action-btn small" 
+                    title="View/Upload Completed Work"
+                    on:click={() => openDocumentUploadModal(quote)}
+                  >
+                    📎
+                  </button>
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -228,6 +261,18 @@
     organisationName={currentQuoteForNotes.organisation}
     on:save={handleSaveNotes}
     on:cancel={closeNotesModal}
+  />
+{/if}
+
+<!-- Document Upload Modal Instance -->
+{#if showDocumentUploadModal && currentQuoteForUpload}
+  <DocumentUploadModal
+    bind:showModal={showDocumentUploadModal}
+    title={`Upload Completed Work for ${currentQuoteForUpload.organisation}`}
+    quoteId={currentQuoteForUpload.id}
+    documentType="instruction"
+    on:uploadComplete={handleDocumentUploadComplete}
+    on:close={closeDocumentUploadModal}
   />
 {/if}
 

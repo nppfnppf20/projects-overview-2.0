@@ -12,6 +12,7 @@
   } from "$lib/stores/projectStore";
   import LineItemsModal from '$lib/components/LineItemsModal.svelte';
   import PartiallyInstructedModal from '$lib/components/PartiallyInstructedModal.svelte';
+  import DocumentUploadModal from '$lib/components/DocumentUploadModal.svelte';
   
   // Instruction status options for dropdown (can be imported or defined here)
   const instructionStatuses: InstructionStatus[] = [
@@ -58,6 +59,11 @@
   let showPartiallyInstructedModal = false;
   let quoteForPartialInstruction: Quote | null = null;
   let currentlySelectedStatus: InstructionStatus | null = null;
+
+  // State for document upload modal
+  let showDocumentUploadModal = false;
+  let quoteForDocumentUpload: Quote | null = null;
+  let documentUploadType: 'quote' | 'instruction' | null = null;
   
   function openNewQuoteModal() {
     resetNewQuoteForm();
@@ -216,6 +222,25 @@
       quoteForPartialInstruction = null;
       currentlySelectedStatus = null;
   }
+
+  // Functions for Document Upload Modal
+  function openDocumentUploadModal(quote: Quote, type: 'quote' | 'instruction') {
+      quoteForDocumentUpload = quote;
+      documentUploadType = type;
+      showDocumentUploadModal = true;
+  }
+
+  function closeDocumentUploadModal() {
+      showDocumentUploadModal = false;
+      quoteForDocumentUpload = null;
+      documentUploadType = null;
+  }
+
+  function handleUploadComplete(event: CustomEvent<{ quoteId: string, documentType: 'quote' | 'instruction', fileName: string }>) {
+      const { quoteId, documentType, fileName } = event.detail;
+      console.log(`Successfully uploaded ${documentType} document "${fileName}" for quote ${quoteId}`);
+      // TODO: Potentially update UI or quote state to reflect uploaded file
+  }
 </script>
 
 <div class="quotes-container">
@@ -293,10 +318,18 @@
                 >Edit</button>
               </td>
               <td class="action-cell icon-cell">
-                <button class="action-btn icon-btn" title="Manage Quote Documents (TBD)">📎</button>
+                <button 
+                  class="action-btn icon-btn" 
+                  title="Manage Quote Documents"
+                  on:click={() => openDocumentUploadModal(quote, 'quote')}
+                >📎</button>
               </td>
               <td class="action-cell icon-cell">
-                <button class="action-btn icon-btn" title="Manage Instruction Documents (TBD)">📎</button>
+                <button 
+                  class="action-btn icon-btn" 
+                  title="Manage Instruction Documents"
+                  on:click={() => openDocumentUploadModal(quote, 'instruction')}
+                >📎</button>
               </td>
             </tr>
           {/each}
@@ -420,6 +453,18 @@
       quote={quoteForPartialInstruction}
       on:confirm={handlePartialInstructionConfirm}
       on:cancel={handlePartialInstructionCancel} 
+    />
+  {/if}
+
+  <!-- Document Upload Modal -->
+  {#if showDocumentUploadModal && quoteForDocumentUpload && documentUploadType}
+    <DocumentUploadModal 
+      bind:showModal={showDocumentUploadModal}
+      title={`Upload ${documentUploadType === 'quote' ? 'Quote' : 'Instruction'} Document`}
+      quoteId={quoteForDocumentUpload.id}
+      documentType={documentUploadType}
+      on:close={closeDocumentUploadModal}
+      on:uploadComplete={handleUploadComplete}
     />
   {/if}
 </div>
