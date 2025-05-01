@@ -9,7 +9,13 @@
     type SurveyorReview, 
     type WorkStatus // Import the status type
   } from "$lib/stores/projectStore";
+  import NotesModal from "$lib/components/NotesModal.svelte"; // Import the new modal
   
+  // Modal state for Notes
+  let showNotesModal = false;
+  let currentQuoteForNotes: Quote | null = null;
+  let currentNotes: string | undefined = '';
+
   // Filter for instructed quotes based on selected project
   $: instructedQuotes = $selectedProject 
     ? $allQuotes.filter(quote => 
@@ -63,6 +69,52 @@
   // Work status options for dropdown
   const workStatuses: WorkStatus[] = ['not started', 'in progress', 'completed'];
 
+  // --- Notes Modal Functions ---
+  function openNotesModal(quote: Quote, review: SurveyorReview | undefined) {
+    currentQuoteForNotes = quote;
+    currentNotes = review?.notes;
+    showNotesModal = true;
+  }
+
+  function closeNotesModal() {
+    showNotesModal = false;
+    currentQuoteForNotes = null;
+    currentNotes = '';
+  }
+
+  function handleSaveNotes(event: CustomEvent<{ notes: string }>) {
+    if (!$selectedProject || !currentQuoteForNotes) return;
+    
+    const newNotes = event.detail.notes;
+    const existingReview = findReview(currentQuoteForNotes.id);
+    
+    const reviewData: Omit<SurveyorReview, 'id'> & { id?: string } = {
+      projectId: $selectedProject.id,
+      quoteId: currentQuoteForNotes.id,
+      notes: newNotes, // Update notes
+      // Provide defaults or existing values for other fields
+      quality: existingReview?.quality,
+      responsiveness: existingReview?.responsiveness,
+      deliveredOnTime: existingReview?.deliveredOnTime,
+      overallReview: existingReview?.overallReview ?? 0,
+      reviewDate: existingReview?.reviewDate ?? new Date().toISOString().split('T')[0],
+      siteVisitDate: existingReview?.siteVisitDate,
+      reportDraftDate: existingReview?.reportDraftDate,
+      workStatus: existingReview?.workStatus,
+      ...(existingReview?.id ? { id: existingReview.id } : {}),
+    };
+
+    addOrUpdateReview(reviewData);
+    closeNotesModal();
+  }
+
+  // Helper function to get the first line of notes or a placeholder
+  function getNotesPreview(notes: string | undefined): string {
+    if (!notes || notes.trim() === '') {
+      return "Add notes...";
+    }
+    return notes.split('\n')[0]; // Get first line
+  }
 </script>
 
 <div class="instructed-container">
@@ -86,7 +138,7 @@
               <th>Work Status</th>
               <th>Site Visit</th>
               <th>Report Draft</th>
-              <th>Actions</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -143,9 +195,16 @@
                   />
                 </td>
                 <td>
-                  <div class="action-buttons">
-                    <button class="action-btn small">View</button>
-                    <button class="action-btn small">Reminder</button>
+                  <!-- Notes Cell - Clickable area -->
+                  <div 
+                    class="notes-preview {review?.notes ? 'has-notes' : 'no-notes'}"
+                    on:click={() => openNotesModal(quote, review)}
+                    role="button"
+                    tabindex="0"
+                    title={review?.notes ? "Click to edit notes" : "Click to add notes"}
+                    on:keypress={(e) => { if (e.key === 'Enter') openNotesModal(quote, review); }}
+                  >
+                    {getNotesPreview(review?.notes)}
                   </div>
                 </td>
               </tr>
@@ -161,6 +220,16 @@
     <p>Please select a project to view instructed surveyors.</p>
   {/if}
 </div>
+
+<!-- Notes Modal Instance -->
+{#if showNotesModal && currentQuoteForNotes}
+  <NotesModal 
+    initialNotes={currentNotes} 
+    organisationName={currentQuoteForNotes.organisation}
+    on:save={handleSaveNotes}
+    on:cancel={closeNotesModal}
+  />
+{/if}
 
 <style>
   .instructed-container {
@@ -337,6 +406,36 @@
   .survey-cards, .surveyor-card, .card-header, .card-content, .card-footer, .surveyor-detail, .icon, .divider, .dates-section, .date-input-group {
       /* These styles are no longer needed */
       display: none; /* Or simply remove these rules */
+  }
+
+  /* Notes Preview Styles */
+  .notes-preview {
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    border: 1px dashed #ced4da; /* Dashed border to look editable */
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    color: #6c757d; /* Grey text for placeholder */
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Show ellipsis if text overflows */
+    display: block; /* Ensure it behaves as a block for overflow */
+    max-width: 250px; /* Explicitly set a max width */
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+
+  .notes-preview.has-notes {
+    border-style: solid; /* Solid border if notes exist */
+    background-color: #fff; /* White background for actual notes */
+    color: #333; /* Darker text for actual notes */
+  }
+
+  .notes-preview:hover, 
+  .notes-preview:focus {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    outline: none;
   }
 
 </style> 
