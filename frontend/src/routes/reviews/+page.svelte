@@ -14,7 +14,8 @@
   // Filter for instructed quotes based on selected project
   $: instructedQuotes = $selectedProject 
     ? $allQuotes.filter(quote => 
-        quote.projectId === $selectedProject.id && quote.instructionStatus === 'instructed'
+        quote.projectId === $selectedProject.id && 
+        (quote.instructionStatus === 'instructed' || quote.instructionStatus === 'partially instructed')
       ) 
     : [];
 

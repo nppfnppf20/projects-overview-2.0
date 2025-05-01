@@ -13,7 +13,8 @@
   // Filter for instructed quotes based on selected project
   $: instructedQuotes = $selectedProject 
     ? $allQuotes.filter(quote => 
-        quote.projectId === $selectedProject.id && quote.instructionStatus === 'instructed'
+        quote.projectId === $selectedProject.id && 
+        (quote.instructionStatus === 'instructed' || quote.instructionStatus === 'partially instructed')
       ) 
     : [];
 
@@ -42,6 +43,7 @@
       reviewDate: existingReview?.reviewDate || new Date().toISOString().split('T')[0],
       siteVisitDate: existingReview?.siteVisitDate,
       reportDraftDate: existingReview?.reportDraftDate,
+      workStatus: existingReview?.workStatus || 'not started', // Keep existing work status
       // Add existing ID if updating
       ...(existingReview?.id ? { id: existingReview.id } : {}),
       // Update the specific date field that was changed
@@ -49,14 +51,15 @@
     };
 
     addOrUpdateReview(reviewData);
-    // Trigger reactivity for the table (though store update should suffice)
-    instructedQuotes = [...instructedQuotes]; 
+    // Trigger reactivity (store update should handle this, but explicit doesn't hurt)
+    // Note: Direct mutation isn't needed here as the store update triggers reactivity.
   }
   
   // Function to handle work status change from dropdown
   function handleWorkStatusChange(quoteId: string, newStatus: WorkStatus) {
       if (!$selectedProject) return;
       updateWorkStatus(quoteId, $selectedProject.id, newStatus);
+      // Note: Store update triggers reactivity.
   }
   
   // Work status options for dropdown
@@ -70,87 +73,83 @@
   {#if $selectedProject}
     <div class="instructed-header">
       <h2>Surveyors for {$selectedProject.name}</h2>
-      <!-- Button removed as instruction happens on Quotes page -->
     </div>
     
     {#if instructedQuotes.length > 0}
-      <div class="survey-cards">
-        {#each instructedQuotes as quote (quote.id)}
-          {@const review = findReview(quote.id)}
-          {@const currentWorkStatus = review?.workStatus || 'not started'}
-          <div 
-            class="surveyor-card"
-            class:card-completed={currentWorkStatus === 'completed'}
-          >
-            <div class="card-header">
-              <h3>{quote.organisation}</h3>
-              <!-- Dropdown styled as pill -->
-              <div class="status-dropdown-container">
-                 <select 
-                    class="work-status-select {currentWorkStatus.replace(/\s+/g, '-')}" 
-                    value={currentWorkStatus} 
-                    on:change={(e) => handleWorkStatusChange(quote.id, e.currentTarget.value as WorkStatus)}
-                  >
-                    {#each workStatuses as status}
-                      <option value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </option>
-                    {/each}
-                 </select>
-              </div>
-            </div>
-            
-            <div class="card-content">
-              <div class="surveyor-detail">
-                <i class="icon">👤</i>
-                <span>{quote.contactName}</span>
-              </div>
-              {#if quote.email}
-                <div class="surveyor-detail">
-                  <i class="icon">📧</i>
-                  <span><a href="mailto:{quote.email}">{quote.email}</a></span>
-                </div>
-              {/if}
-              <div class="surveyor-detail">
-                <i class="icon">📝</i>
-                <span>{quote.surveyType || 'N/A'}</span>
-              </div>
-              <div class="surveyor-detail">
-                <i class="icon">💰</i>
-                <span>£{quote.total.toFixed(2)} (excl. VAT)</span>
-              </div>
-              
-              <!-- Dates Section -->
-              <hr class="divider" />
-              <div class="dates-section">
-                <h4>Dates</h4>
-                <div class="date-input-group">
-                    <label for="siteVisit-{quote.id}">Site Visit:</label>
-                    <input 
-                        type="date" 
-                        id="siteVisit-{quote.id}" 
-                        value={review?.siteVisitDate || ''} 
-                        on:change={(e) => handleDateUpdate(quote.id, 'siteVisitDate', e.currentTarget.value)}
-                    />
-                </div>
-                 <div class="date-input-group">
-                    <label for="reportDraft-{quote.id}">Report First Draft:</label>
-                    <input 
-                        type="date" 
-                        id="reportDraft-{quote.id}" 
-                        value={review?.reportDraftDate || ''} 
-                        on:change={(e) => handleDateUpdate(quote.id, 'reportDraftDate', e.currentTarget.value)}
-                    />
-                </div>
-              </div>
-            </div>
-            
-            <div class="card-footer">
-              <button class="action-btn">View Details</button>
-              <button class="action-btn">Send Reminder</button>
-            </div>
-          </div>
-        {/each}
+      <div class="table-container">
+        <table class="surveyor-table">
+          <thead>
+            <tr>
+              <th>Organisation</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Survey Type</th>
+              <th>Total (ex. VAT)</th>
+              <th>Site Visit</th>
+              <th>Report Draft</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each instructedQuotes as quote (quote.id)}
+              {@const review = findReview(quote.id)}
+              {@const currentWorkStatus = review?.workStatus || 'not started'}
+              <tr class:row-completed={currentWorkStatus === 'completed'}>
+                <td>{quote.organisation}</td>
+                <td>{quote.contactName}</td>
+                <td>
+                  {#if quote.email}
+                    <a href="mailto:{quote.email}">{quote.email}</a>
+                  {:else}
+                    N/A
+                  {/if}
+                </td>
+                <td>{quote.surveyType || 'N/A'}</td>
+                <td>£{quote.total.toFixed(2)}</td>
+                <td>
+                  <input 
+                    type="date" 
+                    class="date-input"
+                    id="siteVisit-{quote.id}" 
+                    value={review?.siteVisitDate || ''} 
+                    on:change={(e) => handleDateUpdate(quote.id, 'siteVisitDate', e.currentTarget.value)}
+                  />
+                </td>
+                <td>
+                  <input 
+                    type="date" 
+                    class="date-input"
+                    id="reportDraft-{quote.id}" 
+                    value={review?.reportDraftDate || ''} 
+                    on:change={(e) => handleDateUpdate(quote.id, 'reportDraftDate', e.currentTarget.value)}
+                  />
+                </td>
+                <td>
+                  <div class="status-dropdown-container">
+                     <select 
+                        class="work-status-select {currentWorkStatus.replace(/\s+/g, '-')}" 
+                        value={currentWorkStatus} 
+                        on:change={(e) => handleWorkStatusChange(quote.id, e.currentTarget.value as WorkStatus)}
+                      >
+                        {#each workStatuses as status}
+                          <option value={status}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </option>
+                        {/each}
+                     </select>
+                  </div>
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="action-btn small-btn">View</button>
+                    <button class="action-btn small-btn">Remind</button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       </div>
     {:else}
       <p class="no-data-message">No surveyors have been marked as instructed for this project yet.</p>
@@ -183,111 +182,71 @@
     color: #555;
     margin: 0;
   }
-  
-  .survey-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .surveyor-card {
+
+  .table-container {
+    overflow-x: auto; /* Allows table to scroll horizontally if needed */
     background-color: #fff;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: background-color 0.3s ease;
   }
-  
-  .surveyor-card.card-completed {
-    background-color: #e6f7ec;
-    border-left: 5px solid #28a745;
+
+  .surveyor-table {
+    width: 100%;
+    border-collapse: collapse;
   }
-  
-  .card-header {
-    padding: 1rem;
-    background-color: #f8f9fa;
+
+  .surveyor-table th, 
+  .surveyor-table td {
+    padding: 0.8rem 1rem;
+    text-align: left;
     border-bottom: 1px solid #eee;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    vertical-align: middle; /* Align content vertically */
+    font-size: 0.9rem;
+    white-space: nowrap; /* Prevent text wrapping initially */
   }
-  
-  h3 {
-    margin: 0;
-    color: #495057;
-    font-size: 1.1rem;
+
+  .surveyor-table th {
+    background-color: #f8f9fa;
     font-weight: 600;
-  }
-  
-  .status-badge {
-    /* Removed as it was specific to the old static badge */
-  }
-  
-  .status-instructed {
-    /* Removed as it was specific to the old static badge */
-  }
-  
-  .card-content {
-    padding: 1rem;
-    flex-grow: 1;
-    display: flex; /* Allow column layout */
-    flex-direction: column;
-  }
-  
-  .surveyor-detail {
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-  }
-  
-  .surveyor-detail:last-of-type {
-      margin-bottom: 0; 
+    color: #495057;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  .divider {
-      border: 0;
-      border-top: 1px solid #eee;
-      margin: 1rem 0;
+  .surveyor-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .surveyor-table tbody tr:hover {
+    background-color: #f1f3f5;
+  }
+  
+  /* Highlight completed rows */
+  .surveyor-table tbody tr.row-completed {
+    background-color: #e6f7ec; /* Light green background */
+    border-left: 5px solid #28a745; /* Green left border */
   }
 
-  .dates-section {
-      margin-top: auto; /* Push dates to the bottom */
-      padding-top: 1rem; /* Add space above dates */
+  /* Ensure first cell aligns with border */
+  .surveyor-table tbody tr.row-completed td:first-child {
+     border-left: none; 
   }
-  
-  .dates-section h4 {
-      margin: 0 0 0.75rem 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #495057;
+    
+  .surveyor-table tbody tr.row-completed:hover {
+    background-color: #d1f0db; /* Slightly darker green on hover */
   }
 
-  .date-input-group {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
-  }
-  
-  .date-input-group label {
-      flex-basis: 140px; /* Fixed width for labels */
-      flex-shrink: 0;
-      font-size: 0.9rem;
-  }
-  
-  .date-input-group input[type="date"] {
-      flex-grow: 1;
+  /* Input field styling within table */
+  .date-input {
       padding: 0.3rem 0.5rem;
       border: 1px solid #ced4da;
       border-radius: 4px;
       font-size: 0.9rem;
+      width: 130px; /* Fixed width for date inputs */
   }
-
-  .icon {
+  
+  .icon { /* Keep icon styles if used elsewhere, maybe adjust */
     font-style: normal;
     font-size: 1.1rem;
     width: 1.2em;
@@ -303,15 +262,13 @@
     text-decoration: underline;
   }
   
-  .card-footer {
-    padding: 1rem;
-    border-top: 1px solid #eee;
+  /* Action buttons container */
+  .action-buttons {
     display: flex;
-    justify-content: flex-end;
     gap: 0.5rem;
   }
-  
-  .action-btn {
+
+  .action-btn { /* Keep base styles */
     padding: 0.4rem 0.75rem;
     border: none;
     border-radius: 4px;
@@ -319,12 +276,19 @@
     color: white;
     cursor: pointer;
     font-size: 0.875rem;
+    white-space: nowrap; /* Prevent button text wrapping */
   }
   
   .action-btn:hover {
     background-color: #5a6268;
   }
   
+  /* Adjust button padding if needed */
+  .small-btn {
+      padding: 0.3rem 0.6rem;
+      font-size: 0.8rem;
+  }
+
   .no-data-message {
     text-align: center;
     padding: 2rem;
@@ -335,8 +299,10 @@
     margin-top: 1rem;
   }
   
+  /* Status Dropdown styling */
   .status-dropdown-container {
     position: relative; /* Allows absolute positioning of arrow */
+    display: inline-block; /* Make it inline */
   }
 
   .work-status-select {
@@ -358,11 +324,12 @@
       background-color: #6c757d; /* Default grey */
       color: white;
       min-width: 110px; /* Ensure minimum width */
-      text-align: center;
+      text-align: left; /* Align text left */
       background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
       background-repeat: no-repeat;
       background-position: right 0.3rem center;
       background-size: 1.1em;
+      box-sizing: border-box; /* Ensure padding is included in width */
   }
   
   /* Color overrides based on status */

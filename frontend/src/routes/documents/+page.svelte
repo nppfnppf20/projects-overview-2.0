@@ -1,24 +1,30 @@
 <script lang="ts">
   import { selectedProject } from "$lib/stores/projectStore";
-  
-  // Dummy documents data - this would come from your backend
-  const dummyDocuments = [
-    { id: 'd1', name: 'Site Plan.pdf', type: 'PDF', size: '2.4 MB', uploadDate: '2023-06-15', category: 'Plans' },
-    { id: 'd2', name: 'Environmental Assessment.docx', type: 'DOCX', size: '1.8 MB', uploadDate: '2023-06-20', category: 'Reports' },
-    { id: 'd3', name: 'Grid Connection Offer.pdf', type: 'PDF', size: '0.9 MB', uploadDate: '2023-06-22', category: 'Correspondence' },
-    { id: 'd4', name: 'Land Registry Title.pdf', type: 'PDF', size: '1.2 MB', uploadDate: '2023-06-10', category: 'Legal' },
-    { id: 'd5', name: 'Planning Application Form.pdf', type: 'PDF', size: '3.1 MB', uploadDate: '2023-06-25', category: 'Planning' }
-  ];
+  import UploadDocumentModal from '$lib/components/UploadDocumentModal.svelte';
   
   // Document categories
-  const categories = ['All', 'Plans', 'Reports', 'Correspondence', 'Legal', 'Planning'];
+  const categories = ['All', 'Drawing', 'Surveyor Report', 'Other'];
   let selectedCategory = 'All';
-  
+
+  // State for modal visibility
+  let showUploadModal = false;
+
+  // Document data - starts empty
+  let documents: any[] = [];
+
   // Filtering function
   $: filteredDocuments = selectedCategory === 'All' 
-    ? dummyDocuments 
-    : dummyDocuments.filter(doc => doc.category === selectedCategory);
-    
+    ? documents 
+    : documents.filter(doc => doc.category === selectedCategory);
+
+  // Function to handle the uploaded document from the modal
+  function handleDocumentUpload(event: CustomEvent) {
+    const newDocument = event.detail;
+    documents = [...documents, newDocument]; // Add the new document to the main list
+    // Optionally, you might want to switch the category filter to show the new item
+    // selectedCategory = newDocument.category;
+  }
+
   // Function to get icon based on file type
   function getFileIcon(type: string) {
     switch(type.toLowerCase()) {
@@ -45,7 +51,7 @@
   {#if $selectedProject}
     <div class="documents-header">
       <h2>Documents for {$selectedProject.name}</h2>
-      <button class="upload-btn">+ Upload New Document</button>
+      <button class="upload-btn" on:click={() => showUploadModal = true}>+ Upload New Document</button>
     </div>
     
     <div class="filter-bar">
@@ -82,7 +88,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each filteredDocuments as document}
+          {#each filteredDocuments as document (document.id)}
             <tr>
               <td class="file-name">
                 <span class="file-icon">{getFileIcon(document.type)}</span>
@@ -109,6 +115,13 @@
     <p>Please select a project to view documents.</p>
   {/if}
 </div>
+
+{#if showUploadModal}
+  <UploadDocumentModal 
+    on:close={() => showUploadModal = false} 
+    on:uploaddocument={handleDocumentUpload}
+  />
+{/if}
 
 <style>
   .documents-container {

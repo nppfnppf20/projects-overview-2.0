@@ -11,6 +11,7 @@
     type LineItem
   } from "$lib/stores/projectStore";
   import LineItemsModal from '$lib/components/LineItemsModal.svelte';
+  import PartiallyInstructedModal from '$lib/components/PartiallyInstructedModal.svelte';
   
   // Instruction status options for dropdown (can be imported or defined here)
   const instructionStatuses: InstructionStatus[] = [
@@ -52,6 +53,11 @@
   // State for viewing line items modal
   let showLineItemsModal = false;
   let selectedQuoteForLineItems: Quote | null = null;
+  
+  // State for partially instructed modal
+  let showPartiallyInstructedModal = false;
+  let quoteForPartialInstruction: Quote | null = null;
+  let currentlySelectedStatus: InstructionStatus | null = null;
   
   function openNewQuoteModal() {
     resetNewQuoteForm();
@@ -151,8 +157,16 @@
     closeNewQuoteModal();
   }
   
-  function handleStatusChange(quoteId: string, newStatus: InstructionStatus) {
-      updateQuoteInstructionStatus(quoteId, newStatus);
+  function handleStatusChange(quoteId: string, newStatus: InstructionStatus, currentQuote: Quote) {
+      const originalStatus = currentQuote.instructionStatus;
+
+      if (newStatus === 'partially instructed') {
+          quoteForPartialInstruction = currentQuote;
+          currentlySelectedStatus = newStatus; 
+          showPartiallyInstructedModal = true;
+      } else {
+          updateQuoteInstructionStatus(quoteId, newStatus);
+      }
   }
   
   function handleDeleteQuote(quoteId: string, organisationName: string) {
@@ -178,6 +192,28 @@
   function closeLineItemsModal() {
       showLineItemsModal = false;
       selectedQuoteForLineItems = null;
+  }
+
+  // Functions for Partially Instructed Modal
+  function handlePartialInstructionConfirm(event: CustomEvent<{ selectedItems: LineItem[] }>) {
+      const selectedItems = event.detail.selectedItems;
+      if (quoteForPartialInstruction && currentlySelectedStatus) {
+          console.log("Selected partial items:", selectedItems);
+          updateQuoteInstructionStatus(quoteForPartialInstruction.id, currentlySelectedStatus);
+      }
+      closePartiallyInstructedModal();
+  }
+
+  function handlePartialInstructionCancel() {
+       if (quoteForPartialInstruction) {
+       }
+      closePartiallyInstructedModal();
+  }
+  
+  function closePartiallyInstructedModal() {
+      showPartiallyInstructedModal = false;
+      quoteForPartialInstruction = null;
+      currentlySelectedStatus = null;
   }
 </script>
 
@@ -231,8 +267,8 @@
               <td>
                 <select 
                   class="instruction-status-select" 
-                  bind:value={quote.instructionStatus}
-                  on:change={() => handleStatusChange(quote.id, quote.instructionStatus)}
+                  value={quote.instructionStatus}
+                  on:change={(e) => handleStatusChange(quote.id, e.currentTarget.value as InstructionStatus, quote)}
                 >
                   {#each instructionStatuses as status}
                     <option value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
@@ -370,6 +406,15 @@
       items={selectedQuoteForLineItems.lineItems} 
       organisationName={selectedQuoteForLineItems.organisation} 
       on:close={closeLineItemsModal} 
+    />
+  {/if}
+
+  <!-- Partially Instructed Modal -->
+  {#if showPartiallyInstructedModal && quoteForPartialInstruction}
+    <PartiallyInstructedModal 
+      quote={quoteForPartialInstruction}
+      on:confirm={handlePartialInstructionConfirm}
+      on:cancel={handlePartialInstructionCancel} 
     />
   {/if}
 </div>
