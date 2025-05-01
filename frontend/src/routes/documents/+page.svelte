@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { selectedProject } from "$lib/stores/projectStore";
+  import { selectedProject, allDocuments, addDocument, type Document, type DocumentCategory } from "$lib/stores/projectStore";
+  import { derived } from "svelte/store";
+  import UploadDocumentModal from '$lib/components/UploadDocumentModal.svelte';
   
   // Dummy documents data - this would come from your backend
   const dummyDocuments = [
@@ -11,7 +13,7 @@
   ];
   
   // Document categories
-  const categories = ['All', 'Plans', 'Reports', 'Correspondence', 'Legal', 'Planning'];
+  const categories = ['All', 'Planning', 'Drawings', 'Surveyor Reports', 'Other'];
   let selectedCategory = 'All';
   
   // Filtering function
@@ -37,6 +39,58 @@
         return '📁';
     }
   }
+
+  // NEW: State for upload modal
+  let showUploadModal = false;
+
+  // Derive documents for the selected project
+  const projectDocuments = derived(
+      [allDocuments, selectedProject],
+      ([$allDocs, $project]) => {
+          if (!$project) return [];
+          return $allDocs.filter(doc => doc.projectId === $project.id);
+      }
+  );
+
+  function openUploadModal() {
+      showUploadModal = true;
+  }
+
+  // NEW: Handler for saving the uploaded document metadata
+  function handleUploadSave(event: CustomEvent<{
+      category: DocumentCategory;
+      documentName: string;
+      version: string;
+      dateUploaded: string;
+      uploadedBy: string;
+      file: File; // The actual file object
+  }>) {
+      if (!$selectedProject) return;
+      
+      const newDocData = event.detail;
+      
+      // Add the document metadata to the store
+      addDocument({
+          projectId: $selectedProject.id,
+          category: newDocData.category,
+          documentName: newDocData.documentName,
+          version: newDocData.version,
+          dateUploaded: newDocData.dateUploaded,
+          uploadedBy: newDocData.uploadedBy, // Replace with real user data later
+          fileName: newDocData.file.name // Store the file name
+      });
+      
+      // In a real app, you would now handle the actual file upload
+      // (e.g., send newDocData.file to a server endpoint)
+      console.log("Simulating upload for:", newDocData.file.name);
+      
+      showUploadModal = false; // Close the modal
+  }
+
+  // NEW: Handler for cancelling the upload modal
+  function handleUploadCancel() {
+      showUploadModal = false;
+  }
 </script>
 
 <div class="documents-container">
@@ -45,7 +99,7 @@
   {#if $selectedProject}
     <div class="documents-header">
       <h2>Documents for {$selectedProject.name}</h2>
-      <button class="upload-btn">+ Upload New Document</button>
+      <button class="upload-btn" on:click={openUploadModal}>+ Upload New Document</button>
     </div>
     
     <div class="filter-bar">
@@ -73,32 +127,32 @@
       <table class="documents-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Size</th>
-            <th>Upload Date</th>
-            <th>Category</th>
+            <th>Document Category</th>
+            <th>Document Name</th>
+            <th>Version</th>
+            <th>Date Uploaded</th>
+            <th>Uploaded By</th>
+            <th>File Name</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {#each filteredDocuments as document}
+          {#each $projectDocuments as doc (doc.id)}
             <tr>
-              <td class="file-name">
-                <span class="file-icon">{getFileIcon(document.type)}</span>
-                {document.name}
-              </td>
-              <td>{document.type}</td>
-              <td>{document.size}</td>
-              <td>{new Date(document.uploadDate).toLocaleDateString()}</td>
-              <td>
-                <span class="category-badge">{document.category}</span>
-              </td>
+              <td>{doc.category}</td>
+              <td>{doc.documentName}</td>
+              <td>{doc.version}</td>
+              <td>{doc.dateUploaded}</td>
+              <td>{doc.uploadedBy}</td>
+              <td>{doc.fileName}</td>
               <td class="action-cell">
-                <button class="action-btn view-btn">View</button>
-                <button class="action-btn download-btn">Download</button>
-                <button class="action-btn delete-btn">Delete</button>
+                <button class="action-btn view-btn" title="View Document">View</button>
+                <button class="action-btn download-btn" title="Download Document">Download</button>
               </td>
+            </tr>
+          {:else}
+            <tr>
+              <td colspan="7" class="no-data-message">No documents found for this project.</td>
             </tr>
           {/each}
         </tbody>
@@ -107,6 +161,11 @@
     
   {:else}
     <p>Please select a project to view documents.</p>
+  {/if}
+
+  <!-- NEW: Render Upload Modal Conditionally -->
+  {#if showUploadModal}
+    <UploadDocumentModal on:save={handleUploadSave} on:cancel={handleUploadCancel} />
   {/if}
 </div>
 
@@ -134,17 +193,18 @@
   }
   
   .upload-btn {
-    background-color: #28a745;
+    background-color: #17a2b8;
     color: white;
     padding: 0.6rem 1.2rem;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
+    transition: background-color 0.2s;
   }
   
   .upload-btn:hover {
-    background-color: #218838;
+    background-color: #138496;
   }
   
   .filter-bar {
@@ -201,12 +261,13 @@
     background-color: #fff;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
+    overflow-x: auto;
   }
   
   .documents-table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 900px;
   }
   
   .documents-table th,
@@ -214,6 +275,8 @@
     padding: 1rem;
     text-align: left;
     border-bottom: 1px solid #eee;
+    font-size: 0.95rem;
+    white-space: nowrap;
   }
   
   .documents-table th {
@@ -227,40 +290,31 @@
   }
   
   .documents-table tr:hover {
-    background-color: #f8f9fa;
+    background-color: #f1f1f1;
   }
   
-  .file-name {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .file-icon {
-    font-size: 1.2rem;
-  }
-  
-  .category-badge {
-    display: inline-block;
-    padding: 0.3rem 0.6rem;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    background-color: #e9ecef;
-    color: #495057;
+  .no-data-message {
+      text-align: center;
+      color: #6c757d;
+      padding: 2rem;
   }
   
   .action-cell {
     white-space: nowrap;
-    display: flex;
-    gap: 0.5rem;
   }
   
   .action-btn {
-    padding: 0.4rem 0.75rem;
+    padding: 0.4rem 0.8rem;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.875rem;
+    margin-right: 0.5rem; 
+    transition: opacity 0.2s;
+  }
+
+  .action-btn:last-child {
+      margin-right: 0;
   }
   
   .view-btn {
@@ -273,12 +327,7 @@
     color: white;
   }
   
-  .delete-btn {
-    background-color: #dc3545;
-    color: white;
-  }
-  
   .action-btn:hover {
-    opacity: 0.9;
+    opacity: 0.85;
   }
 </style> 

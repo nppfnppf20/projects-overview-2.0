@@ -1,11 +1,12 @@
 import { writable } from 'svelte/store';
 
 // --- Project Interface and Store ---
-interface Project {
+export interface Project {
   id: string;
   name: string;
   // Basic Project Information
   clientName?: string;
+  spvName?: string;
   detailedDescription?: string;
   proposedUseDuration?: number;
   projectType?: 'solar' | 'bess' | 'solarBess' | 'other';
@@ -392,4 +393,63 @@ export function updateProgrammeEvent(eventId: string, updatedData: Partial<Progr
 
 export function deleteProgrammeEvent(eventId: string) {
     allProgrammeEvents.update(events => events.filter(event => event.id !== eventId));
-} 
+}
+
+// --- Document Interface and Store ---
+export type DocumentCategory = 
+    | 'Planning Application' 
+    | 'Consultation Response' 
+    | 'Survey Report' 
+    | 'Site Plan' 
+    | 'Quote' 
+    | 'Instruction' 
+    | 'Other';
+
+export interface Document {
+    id: string;
+    projectId: string;
+    category: DocumentCategory;
+    documentName: string;
+    version: string; // Or number, using string for flexibility (e.g., '1.0', 'Final')
+    dateUploaded: string; // ISO date string (YYYY-MM-DD)
+    uploadedBy: string; // Store username or ID
+    fileName: string; // The actual name of the uploaded file
+    // We won't store the file content here, just metadata
+}
+
+// Example initial documents (optional)
+const initialDocuments: Document[] = [
+    {
+        id: 'doc1',
+        projectId: 'project-1',
+        category: 'Site Plan',
+        documentName: 'Existing Site Layout',
+        version: '1.0',
+        dateUploaded: '2023-10-26',
+        uploadedBy: 'Admin User',
+        fileName: 'site_layout_v1.pdf'
+    },
+     {
+        id: 'doc2',
+        projectId: 'project-1',
+        category: 'Quote',
+        documentName: 'EcoSurveys Ltd - PEA Quote',
+        version: '1.1',
+        dateUploaded: '2023-05-16',
+        uploadedBy: 'Admin User',
+        fileName: 'ecosurveys_pea_quote_v1.1.pdf'
+    }
+];
+
+export const allDocuments = writable<Document[]>(initialDocuments);
+
+// Function to add a new document (metadata only)
+export function addDocument(docData: Omit<Document, 'id'>) {
+    const newDocument: Document = {
+        ...docData,
+        id: `doc-${Date.now()}`
+    };
+    allDocuments.update(docs => [...docs, newDocument]);
+}
+
+// Optional: Add update/delete functions later if needed 

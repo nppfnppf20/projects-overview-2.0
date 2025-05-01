@@ -11,10 +11,11 @@
   import { getContext, setContext } from 'svelte';
   import { writable, type Writable } from 'svelte/store';
   
-  // Filter for instructed quotes based on selected project
+  // MODIFIED: Filter for instructed OR partially instructed quotes for reviews
   $: instructedQuotes = $selectedProject 
     ? $allQuotes.filter(quote => 
-        quote.projectId === $selectedProject.id && quote.instructionStatus === 'instructed'
+        quote.projectId === $selectedProject.id && 
+        (quote.instructionStatus === 'instructed' || quote.instructionStatus === 'partially instructed')
       ) 
     : [];
 

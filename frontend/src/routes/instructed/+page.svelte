@@ -10,10 +10,11 @@
     type WorkStatus // Import the status type
   } from "$lib/stores/projectStore";
   
-  // Filter for instructed quotes based on selected project
+  // MODIFIED: Filter for instructed OR partially instructed quotes
   $: instructedQuotes = $selectedProject 
     ? $allQuotes.filter(quote => 
-        quote.projectId === $selectedProject.id && quote.instructionStatus === 'instructed'
+        quote.projectId === $selectedProject.id && 
+        (quote.instructionStatus === 'instructed' || quote.instructionStatus === 'partially instructed')
       ) 
     : [];
 

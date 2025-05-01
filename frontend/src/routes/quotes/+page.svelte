@@ -11,6 +11,7 @@
     type LineItem
   } from "$lib/stores/projectStore";
   import LineItemsModal from '$lib/components/LineItemsModal.svelte';
+  import PartialInstructionModal from '$lib/components/PartialInstructionModal.svelte';
   
   // Instruction status options for dropdown (can be imported or defined here)
   const instructionStatuses: InstructionStatus[] = [
@@ -24,6 +25,13 @@
   let showNewQuoteModal = false;
   let isEditing = false;
   let quoteToEditId: string | null = null;
+  
+  // State for viewing line items modal
+  let showLineItemsModal = false;
+  let selectedQuoteForLineItems: Quote | null = null;
+  
+  let showPartialInstructionModal = false;
+  let quoteForPartialInstruction: Quote | null = null;
   
   // Function to create a blank line item object
   function createNewLineItem(): LineItem {
@@ -48,10 +56,6 @@
 
   // New quote/edit quote form data
   let newQuoteForm = createInitialFormState();
-  
-  // State for viewing line items modal
-  let showLineItemsModal = false;
-  let selectedQuoteForLineItems: Quote | null = null;
   
   function openNewQuoteModal() {
     resetNewQuoteForm();
@@ -151,14 +155,40 @@
     closeNewQuoteModal();
   }
   
-  function handleStatusChange(quoteId: string, newStatus: InstructionStatus) {
-      updateQuoteInstructionStatus(quoteId, newStatus);
+  function handleStatusChange(quoteId: string, newStatus: InstructionStatus, event: Event) {
+      const target = event.target as HTMLSelectElement;
+      const quote = $allQuotes.find(q => q.id === quoteId);
+      if (!quote) return;
+
+      const originalStatus = quote.instructionStatus;
+
+      if (newStatus === 'partially instructed') {
+          quoteForPartialInstruction = quote;
+          showPartialInstructionModal = true;
+          setTimeout(() => {
+              if (target) target.value = originalStatus;
+          }, 0);
+      } else {
+          updateQuoteInstructionStatus(quoteId, newStatus);
+      }
   }
   
   function handleDeleteQuote(quoteId: string, organisationName: string) {
     if (confirm(`Are you sure you want to delete the quote from ${organisationName}? This cannot be undone.`)) {
       deleteQuote(quoteId);
     }
+  }
+  
+  function handlePartialInstructionConfirm() {
+      if (!quoteForPartialInstruction) return;
+      updateQuoteInstructionStatus(quoteForPartialInstruction.id, 'partially instructed');
+      showPartialInstructionModal = false;
+      quoteForPartialInstruction = null;
+  }
+
+  function handlePartialInstructionCancel() {
+      showPartialInstructionModal = false;
+      quoteForPartialInstruction = null;
   }
   
   // Calculate total for new quote (now iterates through the array directly)
@@ -230,9 +260,9 @@
               <td class="text-right">£{quote.total.toFixed(2)}</td>
               <td>
                 <select 
-                  class="instruction-status-select" 
-                  bind:value={quote.instructionStatus}
-                  on:change={() => handleStatusChange(quote.id, quote.instructionStatus)}
+                  class="instruction-status-select"
+                  value={quote.instructionStatus}
+                  on:change={(e) => handleStatusChange(quote.id, e.currentTarget.value as InstructionStatus, e)}
                 >
                   {#each instructionStatuses as status}
                     <option value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
@@ -371,6 +401,16 @@
       organisationName={selectedQuoteForLineItems.organisation} 
       on:close={closeLineItemsModal} 
     />
+  {/if}
+
+  <!-- NEW: Partial Instruction Modal -->
+  {#if showPartialInstructionModal && quoteForPartialInstruction}
+      <PartialInstructionModal 
+          lineItems={quoteForPartialInstruction.lineItems} 
+          organisationName={quoteForPartialInstruction.organisation}
+          on:confirm={handlePartialInstructionConfirm}
+          on:cancel={handlePartialInstructionCancel}
+      />
   {/if}
 </div>
 
