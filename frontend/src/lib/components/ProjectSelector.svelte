@@ -4,10 +4,18 @@
 
   let showAddProjectInput = writable(false);
   let newProjectName = '';
+  let selectedClient = ''; // Added state for client dropdown
+  let selectedTeam = ''; // Added state for team dropdown
   let isCollectionsOpen = writable(false); // Track if collections menu is open
+
+  // Mock data for dropdowns (replace with actual data fetching later)
+  const clients = ['Client A', 'Client B', 'Client C'];
+  const teams = ['JR', 'RM', 'PE', 'AD', 'SS']; // Updated team names to initials
 
   function toggleAddProjectForm() {
     showAddProjectInput.update(value => !value);
+    selectedClient = ''; // Reset dropdowns when toggling
+    selectedTeam = '';
   }
 
   function toggleCollections() {
@@ -33,15 +41,21 @@
 
   function addNewProject() {
     if (newProjectName.trim()) {
-      // Add project to the store
+      // Add project to the store (currently only uses name)
+      // In a real app, you'd likely pass client and team info too
+      console.log(`Adding project: ${newProjectName}, Client: ${selectedClient || 'None'}, Team: ${selectedTeam || 'None'}`);
       addProjectToStore(newProjectName.trim());
       newProjectName = '';
+      selectedClient = '';
+      selectedTeam = '';
       showAddProjectInput.set(false);
     }
   }
 
   function cancelAddProject() {
     newProjectName = '';
+    selectedClient = '';
+    selectedTeam = '';
     showAddProjectInput.set(false);
   }
 </script>
@@ -87,6 +101,24 @@
         placeholder="Enter new project name"
         aria-label="New project name"
       />
+      <select bind:value={selectedClient} aria-label="Select Client">
+        <option value="" disabled>Select Client</option>
+        {#each clients as client}
+          <option value={client}>{client}</option>
+        {/each}
+      </select>
+      <!-- Replace select multiple with checkbox group -->
+      <div class="checkbox-group-container" aria-label="Select Team Members">
+          <div class="checkbox-group-header">Select Team Members</div>
+          <div class="checkbox-list">
+            {#each teams as team (team)}
+              <div class="checkbox-item">
+                <input type="checkbox" id="team-{team}" bind:group={selectedTeam} value={team} />
+                <label for="team-{team}">{team}</label>
+              </div>
+            {/each}
+          </div>
+      </div>
       <button on:click={addNewProject}>Add</button>
       <button on:click={cancelAddProject}>Cancel</button>
     </div>
@@ -124,6 +156,17 @@
     border-radius: 4px;
     font-size: 1rem;
     min-width: 200px;
+  }
+
+  /* Add dropdown arrow styles */
+  select {
+    appearance: none; /* Hide default arrow */
+    -webkit-appearance: none; /* Safari and Chrome */
+    -moz-appearance: none; /* Firefox */
+    background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 2rem; /* Make space for the arrow */
   }
 
   .collections-menu {
@@ -173,8 +216,9 @@
     margin-left: 0.5rem;
   }
 
+  /* Adjust add button styling */
   .add-button {
-    padding: 0.35rem 0.7rem;
+    padding: 0; /* Remove default padding */
     font-size: 1.2rem;
     font-weight: bold;
     border-radius: 50%;
@@ -182,6 +226,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 2rem; /* Set fixed width */
+    height: 2rem; /* Set fixed height */
+    line-height: 1; /* Adjust line-height for better centering */
+    flex-shrink: 0; /* Prevent shrinking */
   }
 
   button:last-of-type {
@@ -195,10 +243,58 @@
   .add-project-form {
     display: flex;
     align-items: center;
+    gap: 0.5rem; /* Add gap between elements */
+  }
+
+  .add-project-form input[type="text"] {
+     flex-grow: 1; /* Allow input to take available space */
+  }
+
+  .add-project-form select {
+      min-width: 150px; /* Adjust width as needed */
   }
 
   .current-project {
       font-weight: bold;
       margin-left: auto;
+  }
+
+  /* Styling for the checkbox group */
+  .checkbox-group-container {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+    min-width: 150px; /* Match dropdown width */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .checkbox-group-header {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    color: #555;
+    border-bottom: 1px solid #eee;
+    background-color: #f8f8f8;
+  }
+
+  .checkbox-list {
+    max-height: 100px; /* Make list scrollable */
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
+
+  .checkbox-item label {
+    margin-left: 0.5rem;
+    cursor: pointer;
+  }
+
+  .checkbox-item input[type="checkbox"] {
+    cursor: pointer;
   }
 </style> 
