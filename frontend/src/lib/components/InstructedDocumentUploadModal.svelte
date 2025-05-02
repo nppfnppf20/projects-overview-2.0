@@ -6,21 +6,11 @@
   export let quoteId: string;
   export let documentType: 'quote' | 'instruction'; // To differentiate the upload type
 
-  // Define the NEW status options
-  const documentStatuses = [
-    'Undergoing TRP review',
-    'Undergoing Client Review',
-    'TRP/Client comments'
-    // Consider adding 'Final Report' or similar if needed
-  ] as const; 
-
-  type DocumentStatus = typeof documentStatuses[number];
-
   let files: FileList | null = null;
-  let selectedStatus: DocumentStatus = documentStatuses[0]; // Default to the first status
-  let dateUploaded: string = new Date().toISOString().split('T')[0]; // Default to today
-  let documentTitle: string = '';
-  let documentVersion: string = '';
+  let documentTitle = ''; // State for the document title
+  let version = ''; // State for the version
+  let dateUploaded = new Date().toISOString().split('T')[0]; // State for date uploaded, default today
+  let description = ''; // State for the description input
   let isUploading = false;
   let errorMessage = '';
 
@@ -29,12 +19,11 @@
   function close() {
     if (isUploading) return;
     showModal = false;
-    // Reset all fields
-    files = null; 
-    selectedStatus = documentStatuses[0]; 
-    dateUploaded = new Date().toISOString().split('T')[0];
-    documentTitle = '';
-    documentVersion = '';
+    files = null; // Reset files on close
+    documentTitle = ''; // Reset title
+    version = ''; // Reset version
+    dateUploaded = new Date().toISOString().split('T')[0]; // Reset date
+    description = ''; // Reset description on close
     errorMessage = '';
     dispatch('close');
   }
@@ -44,56 +33,48 @@
       errorMessage = 'Please select a file to upload.';
       return;
     }
-    // Basic validation for new fields (optional, adjust as needed)
-    if (!documentTitle.trim()) {
-      errorMessage = 'Please enter a Document Title.';
-      return;
-    }
-     if (!documentVersion.trim()) {
-      errorMessage = 'Please enter a Version.';
-      return;
-    }
     if (isUploading) return;
 
     isUploading = true;
     errorMessage = '';
     const file = files[0];
 
-    // Simulate upload process including all new fields
-    console.log(`Uploading ${documentType} document for quote ${quoteId}:`, {
-        fileName: file.name,
-        status: selectedStatus,
-        title: documentTitle,
-        version: documentVersion,
-        dateUploaded: dateUploaded
-    });
+    // Simulate upload process
+    console.log(`Uploading ${documentType} document for quote ${quoteId}:`, 
+      `File: ${file.name}`, 
+      `Title: ${documentTitle}`, 
+      `Version: ${version}`, 
+      `Date Uploaded: ${dateUploaded}`, 
+      `Description: ${description}`
+    );
     try {
       // --- Placeholder for actual upload logic ---
-      // Example: Send all data to backend
+      // Example: You would typically use fetch() here to send the file
+      // to your backend endpoint.
       // const formData = new FormData();
       // formData.append('file', file);
       // formData.append('quoteId', quoteId);
-      // formData.append('documentType', documentType); 
-      // formData.append('status', selectedStatus);
+      // formData.append('documentType', documentType);
       // formData.append('title', documentTitle);
-      // formData.append('version', documentVersion);
+      // formData.append('version', version);
       // formData.append('dateUploaded', dateUploaded);
-      // const response = await fetch('/api/upload-instructed-doc', { method: 'POST', body: formData }); 
+      // formData.append('description', description); // Add description to form data
+      // const response = await fetch('/api/upload', { method: 'POST', body: formData });
       // if (!response.ok) throw new Error('Upload failed');
       // --- End Placeholder ---
 
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
 
       console.log('Upload successful');
-      // Include all new fields in the event payload
+      // Add new fields to the dispatched event
       dispatch('uploadComplete', { 
         quoteId, 
         documentType, 
         fileName: file.name, 
-        status: selectedStatus, 
-        title: documentTitle,
-        version: documentVersion,
-        dateUploaded: dateUploaded
+        title: documentTitle, 
+        version, 
+        dateUploaded, 
+        description 
       });
       close();
 
@@ -122,29 +103,52 @@
         <label for="file-upload">Select File:</label>
         <input type="file" id="file-upload" bind:files disabled={isUploading} />
       </div>
-      <div class="form-group">
-        <label for="document-status">Document Status:</label>
-        <select id="document-status" bind:value={selectedStatus} disabled={isUploading}>
-          {#each documentStatuses as status}
-            <option value={status}>{status}</option>
-          {/each}
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="document-title">Document Title:</label>
-        <input type="text" id="document-title" bind:value={documentTitle} disabled={isUploading} placeholder="e.g., Structural Report" />
-      </div>
-      <div class="form-group">
-        <label for="document-version">Version:</label>
-        <input type="text" id="document-version" bind:value={documentVersion} disabled={isUploading} placeholder="e.g., V1.0, Draft A" />
-      </div>
-      <div class="form-group">
-        <label for="date-uploaded">Date uploaded to dashboard:</label>
-        <input type="date" id="date-uploaded" bind:value={dateUploaded} disabled={isUploading} />
-      </div>
        {#if files && files.length > 0}
         <p>Selected file: {files[0].name}</p>
        {/if}
+       <!-- New Title Field -->
+       <div class="form-group">
+         <label for="file-title">Title:</label>
+         <input 
+            type="text" 
+            id="file-title" 
+            bind:value={documentTitle} 
+            placeholder="E.g. Final Report"
+            disabled={isUploading} 
+          />
+       </div>
+       <!-- New Version Field -->
+       <div class="form-group">
+         <label for="file-version">Version:</label>
+         <input 
+            type="text" 
+            id="file-version" 
+            bind:value={version} 
+            placeholder="E.g. v1.0"
+            disabled={isUploading} 
+          />
+       </div>
+       <!-- New Date Uploaded Field -->
+       <div class="form-group">
+         <label for="file-date-uploaded">Date Uploaded:</label>
+         <input 
+            type="date" 
+            id="file-date-uploaded" 
+            bind:value={dateUploaded} 
+            disabled={isUploading} 
+          />
+       </div>
+       <!-- Description Field -->
+       <div class="form-group">
+         <label for="file-description">Description (Optional):</label>
+         <input 
+            type="text" 
+            id="file-description" 
+            bind:value={description} 
+            placeholder="E.g. TRP/Client Comments"
+            disabled={isUploading} 
+          />
+       </div>
     </div>
 
     <div class="modal-footer">
@@ -232,18 +236,22 @@
     color: #555;
   }
 
-  input[type="file"], select, input[type="text"], input[type="date"] {
+  input[type="file"],
+  input[type="text"], /* Apply styling to text input as well */
+  input[type="date"] { /* Apply styling to date input */
     border: 1px solid #ced4da;
     padding: 0.5rem;
     border-radius: 4px;
-    font-size: 0.9rem; 
-    background-color: white; 
+    width: 100%; /* Make text input full width */
+    box-sizing: border-box; /* Include padding and border in element's total width and height */
   }
-  input[type="file"]:disabled, select:disabled, input[type="text"]:disabled, input[type="date"]:disabled {
+
+   input[type="file"]:disabled,
+   input[type="text"]:disabled, /* Apply disabled styling to text input */
+   input[type="date"]:disabled { /* Apply disabled styling to date input */
      background-color: #e9ecef;
      cursor: not-allowed;
-     opacity: 0.7; 
-  }
+   }
 
   .cancel-btn {
     padding: 0.6rem 1.2rem;
