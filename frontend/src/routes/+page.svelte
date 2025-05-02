@@ -447,12 +447,12 @@
   textarea:disabled,
   select:disabled {
     background-color: #e9ecef;
-    opacity: 0.7;
+    color: black;
     cursor: not-allowed;
   }
   
   .radio-group input[type="radio"]:disabled + * { /* Targets the text next to the radio */
-    color: #adb5bd;
+    color: black;
     cursor: not-allowed;
   }
   
@@ -470,16 +470,14 @@
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 1.5rem; /* Add space below legend */
-    padding: 0.75rem; /* Keep padding for spacing */
-    /* background-color: #f8f9fa; */ /* Removed */
-    /* border: 1px solid #dee2e6; */ /* Removed */
-    border-radius: 4px;
   }
   
   .legend input[type="checkbox"] {
-    accent-color: orange;
-    opacity: 1; /* Ensure color is visible */
-    /* Optional: Style checkbox if needed, but disabled state is clear */
+    font-size: 0.9rem; /* Slightly smaller text for legend */
+    background-color: #e9ecef;
+    color: black;
+    cursor: default; /* Indicate it's not interactive */
+    width: auto; /* Fit content */
   }
   
   .legend .legend-text-box {
