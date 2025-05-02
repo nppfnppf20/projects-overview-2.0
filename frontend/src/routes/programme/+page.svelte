@@ -3,121 +3,157 @@
     selectedProject, 
     allProgrammeEvents, 
     addProgrammeEvent,
-    type ProgrammeEvent
+    type ProgrammeEvent,
+    allQuotes,
+    type Quote,
+    getReviewForQuote,
+    type SurveyorReview
   } from "$lib/stores/projectStore";
   import { onMount } from 'svelte';
-  import { Calendar } from '@fullcalendar/core';
-  import dayGridPlugin from '@fullcalendar/daygrid';
-  import interactionPlugin from '@fullcalendar/interaction'; // For date clicking, event dragging etc.
-  import KeyDateModal from '$lib/components/KeyDateModal.svelte'; // Import the modal
+  // import { Calendar } from '@fullcalendar/core'; // Removed
+  // import dayGridPlugin from '@fullcalendar/daygrid'; // Removed
+  // import interactionPlugin from '@fullcalendar/interaction'; // Removed
+  // import KeyDateModal from '$lib/components/KeyDateModal.svelte'; // Removed
   import { derived } from 'svelte/store';
+  import { startOfWeek, addMonths, addWeeks, format, isBefore, min, parseISO, isWithinInterval, endOfWeek } from 'date-fns';
   
   // CSS imports removed from here
 
-  let calendarEl: HTMLElement;
-  let calendar: Calendar;
+  // let calendarEl: HTMLElement; // Removed
+  // let calendar: Calendar; // Removed
 
-  // Modal State
-  let showKeyDateModal = false;
-  let selectedDateStr: string | null = null;
+  // Modal State - Removed
+  // let showKeyDateModal = false; 
+  // let selectedDateStr: string | null = null; 
 
   // Filter programme events for the current project
+  // Simplified - no longer mapping to FullCalendar format
   const currentProjectEvents = derived(
     [allProgrammeEvents, selectedProject],
     ([$allProgrammeEvents, $selectedProject]) => {
       if (!$selectedProject) return [];
-      return $allProgrammeEvents
-        .filter(event => event.projectId === $selectedProject.id)
-        .map(event => ({ // Map to FullCalendar format
-            id: event.id,
-            title: event.title,
-            date: event.date,
-            color: event.color, // Use color directly
-            // backgroundColor: event.color, // Alternatively use these
-            // borderColor: event.color
-        }));
+      // Keep filtering, remove mapping to FullCalendar format
+      return $allProgrammeEvents.filter(event => event.projectId === $selectedProject.id); 
     }
   );
 
+  // Filter instructed/partially instructed surveyors (quotes) for the current project
+  const instructedSurveyors = derived(
+    [allQuotes, selectedProject],
+    ([$allQuotes, $selectedProject]): Quote[] => {
+      if (!$selectedProject) return [];
+      return $allQuotes.filter(quote => 
+        quote.projectId === $selectedProject.id &&
+        (quote.instructionStatus === 'instructed' || quote.instructionStatus === 'partially instructed')
+      );
+    }
+  );
+
+  // onMount block related to calendar removed
+  /*
   onMount(() => {
     calendar = new Calendar(calendarEl, {
-      plugins: [ dayGridPlugin, interactionPlugin ],
-      initialView: 'dayGridMonth',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,dayGridWeek,dayGridDay' // Optional: Add week/day views
-      },
-      events: $currentProjectEvents, // Initial events from store
-      selectable: true, // Allow date selection
-      select: handleDateSelect, // Callback for date selection
-      eventClick: handleEventClick, // Optional: handle clicking existing events
-      height: '100%', // Use 100% height to fill container
-      // aspectRatio: 1.8 
+      // ... calendar config ...
     });
 
     calendar.render();
 
-    // Subscribe to store changes to update calendar events
     const unsubscribe = currentProjectEvents.subscribe(events => {
-      if (calendar) {
-        calendar.setOption('events', events);
-      }
+      // ... update calendar ...
     });
 
-    // Cleanup on component destroy
     return () => {
       calendar.destroy();
-      unsubscribe(); // Unsubscribe from store
+      unsubscribe(); 
     };
   });
+  */
 
+  // Calendar/Modal related functions removed
+  /*
   function handleDateSelect(selectInfo: { startStr: string, endStr: string, allDay: boolean }) {
-      // Adjust end date if it spans multiple days (FullCalendar's end date is exclusive)
-      const endDate = new Date(selectInfo.endStr);
-      endDate.setDate(endDate.getDate() - 1);
-      const adjustedEndStr = endDate.toISOString().split('T')[0];
-
-      // Only handle single day clicks/selections for this feature
-      if (selectInfo.startStr === adjustedEndStr) {
-          selectedDateStr = selectInfo.startStr;
-          showKeyDateModal = true;
-      } else {
-          // If selection is multiple days, clear selection
-          calendar.unselect();
-      }
+      // ... logic ...
   }
 
-  // Optional: Handle clicking on an existing event (e.g., for editing/deleting)
   function handleEventClick(clickInfo: { event: any }) {
-    console.log('Event clicked:', clickInfo.event.id, clickInfo.event.title);
-    // Could open a modal here to edit/delete, passing clickInfo.event.id
-    // Example: Open an edit modal or confirmation dialog
-    // if (confirm(`Delete event '${clickInfo.event.title}'?`)) {
-    //   deleteProgrammeEvent(clickInfo.event.id);
-    // }
+    // ... logic ...
   }
   
   function handleModalSave(event: CustomEvent<{ title: string; date: string; color: string }>) {
-      if (!$selectedProject) return;
-      const newEventData = event.detail;
-      
-      addProgrammeEvent({
-          projectId: $selectedProject.id,
-          title: newEventData.title,
-          date: newEventData.date,
-          color: newEventData.color
-      });
-      
-      showKeyDateModal = false; // Close modal
-      selectedDateStr = null;
-      calendar.unselect(); // Clear selection visuals
+     // ... logic ...
   }
 
   function handleModalCancel() {
-      showKeyDateModal = false;
-      selectedDateStr = null;
-      calendar.unselect(); // Clear selection visuals
+      // ... logic ...
+  }
+  */
+
+  // --- Timeline Calculation ---
+  let timelineStartDate: Date = new Date(); // Default to today
+  let timelineEndDate: Date = addMonths(timelineStartDate, 4); // Initial 4 months
+  let weeks: Date[] = [];
+
+  // Reactive calculation for dates and weeks
+  $: {
+    const today = new Date();
+    // let earliestEventDate: Date | null = null; // No longer needed for start date
+
+    // Keep this logic if needed elsewhere, but not for start date calculation
+    /*
+    if ($currentProjectEvents.length > 0) {
+      const eventDates = $currentProjectEvents.map(event => parseISO(event.date));
+      earliestEventDate = min(eventDates);
+    }
+    */
+
+    // Determine start date: Always use today's date
+    // const potentialStartDate = earliestEventDate ? min([today, earliestEventDate]) : today; // Old logic
+    const potentialStartDate = today; // New logic: always start from today
+    
+    // Ensure start date isn't recalculated when extending range, only on project/event changes
+    // We only calculate the *initial* start date reactively based on events/today.
+    // If timelineStartDate is already set (e.g., by initial load), don't change it unless project changes.
+    if (weeks.length === 0 || !$selectedProject) { // Initialize or reset on project change
+         timelineStartDate = startOfWeek(potentialStartDate, { weekStartsOn: 1 }); 
+         timelineEndDate = addMonths(timelineStartDate, 4); // Reset range on project change
+    }
+
+    // Generate weeks based on current timelineStartDate and timelineEndDate
+    const generatedWeeks: Date[] = [];
+    let currentWeek = timelineStartDate;
+    while (isBefore(currentWeek, timelineEndDate)) {
+      generatedWeeks.push(currentWeek);
+      currentWeek = addWeeks(currentWeek, 1);
+    }
+    weeks = generatedWeeks;
+  }
+
+  // Function to format week date for display
+  function formatWeekHeader(date: Date): string {
+    return `w/c ${format(date, 'd MMM')}`; 
+  }
+
+  // Function to extend timeline by one month
+  function extendTimeline() {
+    timelineEndDate = addMonths(timelineEndDate, 1);
+    // The reactive block `$: { ... }` will automatically update the `weeks` array
+  }
+
+  // Function to check if a date string falls within a given week
+  function isDateInWeek(dateStr: string | undefined | null, weekStartDate: Date): boolean {
+      if (!dateStr) return false;
+      try {
+          const date = parseISO(dateStr);
+          const weekInterval = { 
+              start: weekStartDate, 
+              // Get the end of the week (Sunday) based on the week starting Monday
+              end: endOfWeek(weekStartDate, { weekStartsOn: 1 }) 
+          };
+          return isWithinInterval(date, weekInterval);
+      } catch (e) {
+          console.error("Error parsing date:", dateStr, e);
+          return false;
+      }
   }
 
 </script>
@@ -127,18 +163,61 @@
   
   {#if $selectedProject}
     <div class="programme-header">
-      <h2>Programme for {$selectedProject.name}</h2>
-      <!-- Add relevant buttons here later, e.g., "Add Event" -->
+      <h2>Timeline for {$selectedProject.name}</h2>
     </div>
     
-    <div class="programme-content">
-       <div bind:this={calendarEl} class="calendar-wrapper"></div>
+    <div class="programme-content timeline-view">
+      {#if $instructedSurveyors.length > 0}
+        <table class="timeline-table">
+          <thead>
+            <tr>
+              <th class="sticky-col header-cell">Surveyor</th>
+              {#each weeks as weekDate (format(weekDate, 'yyyy-MM-dd'))}
+                <th class="header-cell week-col">{formatWeekHeader(weekDate)}</th>
+              {/each}
+              <!-- Add More Header Cell -->
+              <th class="header-cell add-week-col">
+                  <button on:click={extendTimeline} title="Add one month">+</button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each $instructedSurveyors as surveyor (surveyor.id)}
+              {@const review = getReviewForQuote(surveyor.id)} 
+              <tr>
+                <td class="sticky-col surveyor-name-cell">{surveyor.organisation} <span class="discipline">({surveyor.discipline})</span></td>
+                {#each weeks as weekDate (format(weekDate, 'yyyy-MM-dd'))}
+                  <td class="week-cell">
+                    {#if review}
+                        {#if isDateInWeek(review.siteVisitDate, weekDate)}
+                            <div class="timeline-event site-visit">Site Visit</div>
+                        {/if}
+                        {#if isDateInWeek(review.reportDraftDate, weekDate)}
+                            <div class="timeline-event draft-due">Draft due</div>
+                        {/if}
+                    {/if}
+                    <!-- Other events could be added here -->
+                  </td>
+                {/each}
+                 <!-- Empty cell for the add column -->
+                 <td class="week-cell"></td> 
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else}
+         <p>No instructed surveyors found for this project to display in the timeline.</p>
+      {/if}
+       
+       <!-- Removed original event list placeholder -->
+
     </div>
   {:else}
     <p>Please select a project to view the programme.</p>
   {/if}
 
-  <!-- Render Key Date Modal -->
+  <!-- Key Date Modal rendering removed -->
+  <!-- 
   {#if showKeyDateModal && selectedDateStr}
     <KeyDateModal 
       selectedDate={selectedDateStr} 
@@ -146,33 +225,25 @@
       on:cancel={handleModalCancel} 
     />
   {/if}
+  -->
 </div>
 
 <style>
   /* CSS Imports moved to app.html or +layout.svelte */
 
-  /* Styles adjusted for better calendar height */
+  /* Styles adjusted for better height without calendar */
    .programme-container {
     padding: 1rem 0;
     display: flex;
     flex-direction: column;
     flex-grow: 1; 
-    /* Calculate height minus header/footer - Adjust 150px as needed */
-    height: calc(100vh - 150px); 
-    overflow: hidden; /* Prevent container scroll */
+    height: calc(100vh - 150px); /* Adjust as needed */
+    overflow: hidden; 
   }
   
-  h1 {
-    margin-bottom: 1.5rem;
-    color: #333;
-    flex-shrink: 0; /* Prevent shrinking */
-  }
-  
-  .programme-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+  h1, .programme-header {
+    padding: 0 1rem; /* Add padding to match content */
+    margin-bottom: 1rem;
     flex-shrink: 0; 
   }
   
@@ -183,43 +254,136 @@
   }
   
   .programme-content {
-    flex-grow: 1; /* Take remaining space */
-    display: flex; 
-    flex-direction: column;
+    flex-grow: 1; 
     background-color: #fff;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    padding: 1rem; 
-    overflow: hidden; /* Hide overflow */
-    min-height: 0; /* Allow shrinking */
+    overflow: auto; /* Allow scrolling for the table */
+    min-height: 0; 
+    padding: 0; /* Remove padding here, add to inner elements if needed */
   }
 
-  .calendar-wrapper {
-      flex-grow: 1; 
-      height: 100%; /* Fill parent */
-      position: relative; /* Needed for absolute positioning of calendar parts */
+  .timeline-view {
+     padding: 1rem; /* Add padding back */
+  }
+
+  .timeline-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed; /* Helps with column widths */
+    margin-bottom: 1rem;
+  }
+
+  .timeline-table th, .timeline-table td {
+    border: 1px solid #dee2e6;
+    padding: 0.5rem;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap; /* Prevent wrapping initially */
   }
   
-  /* Force FullCalendar to take full height of its wrapper */
-  :global(.fc) {
-      height: 100% !important; 
+  .timeline-table thead th {
+    background-color: #f8f9fa;
+    position: sticky; /* Sticky header */
+    top: 0;
+    z-index: 2; /* Ensure header is above body cells */
+  }
+
+  .sticky-col {
+    position: sticky;
+    left: 0;
+    background-color: #f8f9fa; /* Match header bg */
+    z-index: 1; /* Below header corner */
+    width: 200px; /* Fixed width for surveyor column */
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  thead .sticky-col {
+     z-index: 3; /* Ensure top-left corner is on top */
+  }
+
+  .header-cell {
+     text-align: center;
+     vertical-align: middle; /* Align button vertically */
+  }
+
+  .week-col {
+     width: 100px; /* Fixed width for week columns */
+  }
+  
+  .add-week-col {
+     width: 50px; /* Smaller width for the add button */
+     padding: 0; /* Remove padding for button cell */
+  }
+
+  .add-week-col button {
       width: 100%;
+      height: 100%;
+      border: none;
+      background: #e9ecef; /* Slightly different background */
+      cursor: pointer;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 0; /* Match padding of other header cells */
   }
-
-  :global(.fc .fc-view-harness) {
-      height: 100% !important; /* Ensure view harness takes full height */
-  }
-
-  :global(.fc .fc-toolbar-title) {
-      font-size: 1.5em;
-  }
-
-  :global(.fc .fc-button) {
-      font-size: 0.9em;
+  .add-week-col button:hover {
+      background: #ced4da;
   }
   
+  .surveyor-name-cell {
+      font-weight: bold;
+      white-space: normal; /* Allow surveyor name to wrap */
+  }
+  .discipline {
+      font-size: 0.8em;
+      color: #6c757d;
+      display: block; /* Put discipline on new line */
+  }
+
+  .week-cell {
+    min-height: 30px; 
+    border-right: 1px solid #dee2e6; 
+    vertical-align: top; /* Align content to top */
+    padding: 0.3rem; /* Adjust padding slightly */
+  }
+
+  .timeline-event {
+      font-size: 0.8em;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      margin-bottom: 0.2rem;
+      white-space: normal; /* Allow text wrap */
+      line-height: 1.2;
+  }
+  
+  .site-visit {
+      background-color: #cfe2ff; /* Light blue */
+      border: 1px solid #9ec5fe;
+      color: #052c65;
+  }
+
+  .draft-due {
+      background-color: #f8d7da; /* Light red */
+      border: 1px solid #f1aeb5;
+      color: #58151a;
+  }
+
+  /* Add specific style for the last cell in body rows */
+  tbody tr td:last-child {
+      /* Match background or keep it plain? */
+      /* background-color: #f8f9fa; */ 
+      border-right: 1px solid #dee2e6; 
+  }
+
+  /* Placeholder text style remains */
   .placeholder-text {
     color: #6c757d;
     font-style: italic;
+    margin-bottom: 1rem; 
   }
 </style> 
