@@ -16,6 +16,7 @@
   // import KeyDateModal from '$lib/components/KeyDateModal.svelte'; // Removed
   import { derived } from 'svelte/store';
   import { startOfWeek, addMonths, addWeeks, format, isBefore, min, parseISO, isWithinInterval, endOfWeek } from 'date-fns';
+  import TimelineKeyDateModal from '$lib/components/TimelineKeyDateModal.svelte'; // Import the modal
   
   // CSS imports removed from here
 
@@ -32,8 +33,10 @@
     [allProgrammeEvents, selectedProject],
     ([$allProgrammeEvents, $selectedProject]) => {
       if (!$selectedProject) return [];
-      // Keep filtering, remove mapping to FullCalendar format
-      return $allProgrammeEvents.filter(event => event.projectId === $selectedProject.id); 
+      // Ensure events are sorted by date for consistent display
+      return $allProgrammeEvents
+        .filter(event => event.projectId === $selectedProject.id)
+        .sort((a, b) => a.date.localeCompare(b.date)); 
     }
   );
 
@@ -156,6 +159,36 @@
       }
   }
 
+  // --- Component State ---
+  let showTimelineKeyDateModal = false;
+  let selectedWeekStartDateForModal: Date | null = null;
+
+  // --- Modal Handlers ---
+  function handleOpenKeyDateModal(weekDate: Date) {
+    selectedWeekStartDateForModal = weekDate;
+    showTimelineKeyDateModal = true;
+  }
+
+  function handleKeyDateCancel() {
+    showTimelineKeyDateModal = false;
+    selectedWeekStartDateForModal = null;
+  }
+
+  function handleKeyDateSave(event: CustomEvent<{ title: string; date: string; color: string }>) {
+    if (!$selectedProject) return;
+    const { title, date, color } = event.detail;
+    
+    addProgrammeEvent({
+        projectId: $selectedProject.id,
+        title,
+        date, // Date is already in YYYY-MM-DD string format from modal
+        color
+    });
+
+    showTimelineKeyDateModal = false; // Close modal
+    selectedWeekStartDateForModal = null;
+  }
+
 </script>
 
 <div class="programme-container">
@@ -167,24 +200,55 @@
     </div>
     
     <div class="programme-content timeline-view">
-      {#if $instructedSurveyors.length > 0}
+      {#if $instructedSurveyors.length > 0 || $currentProjectEvents.length > 0}
         <table class="timeline-table">
           <thead>
-            <tr>
-              <th class="sticky-col header-cell">Surveyor</th>
+             <!-- Week Header Row -->
+             <tr>
+              <th class="sticky-col header-cell surveyor-header"></th>
               {#each weeks as weekDate (format(weekDate, 'yyyy-MM-dd'))}
                 <th class="header-cell week-col">{formatWeekHeader(weekDate)}</th>
               {/each}
-              <!-- Add More Header Cell -->
               <th class="header-cell add-week-col">
                   <button on:click={extendTimeline} title="Add one month">+</button>
               </th>
+            </tr>
+            <!-- Key Dates Header Row -->
+            <tr>
+                <th class="sticky-col header-cell key-dates-header">Key Dates</th>
+                {#each weeks as weekDate (format(weekDate, 'yyyy-MM-dd'))}
+                    <th class="header-cell key-date-cell">
+                       <!-- Display existing key dates for this week -->
+                       <div class="key-dates-container">
+                           {#each $currentProjectEvents as event (event.id)}
+                               {#if isDateInWeek(event.date, weekDate)}
+                                   <div 
+                                       class="timeline-key-event"
+                                       style="background-color: {event.color}; border-left: 3px solid {event.color === '#ffffff' ? '#ccc' : event.color};" 
+                                       title="{event.title} ({format(parseISO(event.date), 'd MMM')})"
+                                    >
+                                       {event.title}
+                                   </div>
+                               {/if}
+                           {/each}
+                       </div>
+                       <!-- Add button -->
+                       <button 
+                           class="add-key-date-btn"
+                           title="Add key date for {formatWeekHeader(weekDate)}"
+                           on:click={() => handleOpenKeyDateModal(weekDate)}
+                        >
+                           +
+                       </button>
+                    </th>
+                {/each}
+                <th class="header-cell add-week-col"></th> 
             </tr>
           </thead>
           <tbody>
             {#each $instructedSurveyors as surveyor (surveyor.id)}
               {@const review = getReviewForQuote(surveyor.id)} 
-              <tr>
+              <tr class:completed={review?.workStatus === 'completed'}>
                 <td class="sticky-col surveyor-name-cell">{surveyor.organisation} <span class="discipline">({surveyor.discipline})</span></td>
                 {#each weeks as weekDate (format(weekDate, 'yyyy-MM-dd'))}
                   <td class="week-cell">
@@ -196,17 +260,15 @@
                             <div class="timeline-event draft-due">Draft due</div>
                         {/if}
                     {/if}
-                    <!-- Other events could be added here -->
                   </td>
                 {/each}
-                 <!-- Empty cell for the add column -->
                  <td class="week-cell"></td> 
               </tr>
             {/each}
           </tbody>
         </table>
       {:else}
-         <p>No instructed surveyors found for this project to display in the timeline.</p>
+         <p>No instructed surveyors or key dates found for this project.</p>
       {/if}
        
        <!-- Removed original event list placeholder -->
@@ -216,16 +278,15 @@
     <p>Please select a project to view the programme.</p>
   {/if}
 
-  <!-- Key Date Modal rendering removed -->
-  <!-- 
-  {#if showKeyDateModal && selectedDateStr}
-    <KeyDateModal 
-      selectedDate={selectedDateStr} 
-      on:save={handleModalSave} 
-      on:cancel={handleModalCancel} 
+  <!-- Render Key Date Modal -->
+  {#if showTimelineKeyDateModal && selectedWeekStartDateForModal}
+    <TimelineKeyDateModal 
+      bind:showModal={showTimelineKeyDateModal}
+      initialDate={selectedWeekStartDateForModal} 
+      on:save={handleKeyDateSave} 
+      on:cancel={handleKeyDateCancel} 
     />
   {/if}
-  -->
 </div>
 
 <style>
@@ -284,57 +345,121 @@
   
   .timeline-table thead th {
     background-color: #f8f9fa;
-    position: sticky; /* Sticky header */
-    top: 0;
-    z-index: 2; /* Ensure header is above body cells */
+    position: sticky; 
+    /* top: 0; */ /* Removed static top: 0 */
+    z-index: 2; 
+  }
+
+  /* Style specific header rows for top positioning */
+  thead tr:first-child th {
+      top: 0; /* First header row sticks to the very top */
+  }
+  thead tr:nth-child(2) th {
+      top: 38px; /* Second header row sticks below the first (adjust height as needed) */
+      /* Assuming default padding/height, might need adjustment */
   }
 
   .sticky-col {
     position: sticky;
     left: 0;
-    background-color: #f8f9fa; /* Match header bg */
-    z-index: 1; /* Below header corner */
-    width: 200px; /* Fixed width for surveyor column */
+    background-color: #f8f9fa; 
+    z-index: 1; 
+    width: 200px; 
     overflow: hidden;
     text-overflow: ellipsis;
   }
   
+  /* Ensure sticky headers are above sticky column body */
   thead .sticky-col {
-     z-index: 3; /* Ensure top-left corner is on top */
+     z-index: 3; 
+  }
+  /* Ensure the corner cells have highest z-index */
+  thead tr:first-child th.sticky-col {
+      z-index: 4;
+  }
+   thead tr:nth-child(2) th.sticky-col {
+      z-index: 4;
   }
 
   .header-cell {
      text-align: center;
-     vertical-align: middle; /* Align button vertically */
+     vertical-align: middle; 
+     font-weight: bold;
+  }
+  .surveyor-header {
+     /* specific styles if needed */
+  }
+  .key-dates-header {
+     font-size: 0.9em;
+     /* Ensure it aligns vertically with button if needed */
+     vertical-align: bottom;
+     padding-bottom: 0.5rem; /* Add space below text */
   }
 
   .week-col {
-     width: 100px; /* Fixed width for week columns */
-  }
-  
-  .add-week-col {
-     width: 50px; /* Smaller width for the add button */
-     padding: 0; /* Remove padding for button cell */
+     width: 100px; 
   }
 
-  .add-week-col button {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: #e9ecef; /* Slightly different background */
-      cursor: pointer;
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: #495057;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.5rem 0; /* Match padding of other header cells */
-  }
-  .add-week-col button:hover {
-      background: #ced4da;
+  .add-week-col {
+     width: 50px; 
+     padding: 0; 
   }
   
+  .key-date-cell {
+      padding: 0.1rem;
+      vertical-align: top; /* Align content to top */
+      position: relative; /* For positioning button */
+      min-height: 40px; /* Ensure cell has some height */
+  }
+
+  .key-dates-container {
+      /* Container for the event divs */
+      margin-bottom: 2px; /* Space above button */
+      min-height: 20px; /* Ensure space even if no events */
+  }
+
+  .timeline-key-event {
+      font-size: 0.75em;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-bottom: 2px;
+      /* white-space: nowrap; */ /* Removed */
+      /* overflow: hidden; */   /* Removed */
+      /* text-overflow: ellipsis; */ /* Removed */
+      white-space: normal; /* Explicitly allow wrapping */
+      color: #333; 
+      border: 1px solid rgba(0,0,0,0.1);
+      line-height: 1.3;
+      /* max-width: 95%; */ /* Removed max-width */
+      display: block; /* Ensure it takes block space for wrapping */
+  }
+
+  .add-key-date-btn {
+      width: 20px; /* Slightly smaller */
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid #adb5bd;
+      background: #e9ecef;
+      cursor: pointer;
+      font-size: 0.9rem; /* Slightly smaller */
+      font-weight: bold;
+      color: #495057;
+      display: inline-flex; 
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      line-height: 1;
+      /* Position button at bottom right */
+      /* position: absolute; */ /* Or keep inline below events */
+      /* bottom: 2px; */
+      /* right: 2px; */
+      margin-top: 2px; /* Add some space if inline */
+  }
+  .add-key-date-btn:hover {
+      background: #ced4da;
+      border-color: #6c757d;
+  }
+
   .surveyor-name-cell {
       font-weight: bold;
       white-space: normal; /* Allow surveyor name to wrap */
@@ -386,4 +511,17 @@
     font-style: italic;
     margin-bottom: 1rem; 
   }
+
+  /* Style for completed rows */
+  tbody tr.completed td {
+      background-color: #bdf0bd; /* Brighter light green background */
+  }
+
+  /* Ensure sticky column also gets the background */
+  tbody tr.completed td.sticky-col {
+      background-color: #bdf0bd; 
+  }
+
+  /* Adjust sticky column hover/focus if needed when completed */
+  /* tbody tr.completed td.sticky-col:hover { ... } */
 </style> 
