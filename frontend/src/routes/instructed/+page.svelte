@@ -6,10 +6,14 @@
     addOrUpdateReview, // Use this to update dates
     updateWorkStatus, // Import the new function
     addUploadedWork, // Import the new function for adding work details
+    addCustomDateToReview, // Import function for adding custom dates
+    updateCustomDateInReview, // Import function for updating custom dates
+    deleteCustomDateFromReview, // Import function for deleting custom dates
     type Quote, 
     type SurveyorReview, 
     type WorkStatus, // Import the status type
-    type UploadedWork // Import the UploadedWork type
+    type UploadedWork, // Import the UploadedWork type
+    type CustomDate // Import the CustomDate type
   } from "$lib/stores/projectStore";
   import NotesModal from "$lib/components/NotesModal.svelte"; // Import the new modal
   import InstructedDocumentUploadModal from "$lib/components/InstructedDocumentUploadModal.svelte"; // Import the document upload modal
@@ -157,6 +161,22 @@
     }
     return notes;
   }
+
+  // --- Custom Date Functions ---
+  function handleAddCustomDate(quoteId: string) {
+    if (!$selectedProject) return;
+    // Add an empty custom date to trigger UI rendering
+    addCustomDateToReview(quoteId, $selectedProject.id, { title: '', date: '' });
+  }
+
+  function handleCustomDateChange(quoteId: string, customDateId: string, field: 'title' | 'date', value: string) {
+    updateCustomDateInReview(quoteId, customDateId, { [field]: value });
+  }
+
+  function handleDeleteCustomDate(quoteId: string, customDateId: string) {
+    // Optional: Add confirmation dialog here
+    deleteCustomDateFromReview(quoteId, customDateId);
+  }
 </script>
 
 <div class="instructed-container">
@@ -178,8 +198,7 @@
               <th>Survey Type</th>
               <th>Quote Amt.</th>
               <th>Work Status</th>
-              <th>Site Visit</th>
-              <th>Draft Report Due</th>
+              <th>Dates</th>
               <th>Notes</th>
               <th>Works</th>
             </tr>
@@ -222,20 +241,63 @@
                   </div>
                 </td>
                 <td>
-                  <input
-                      type="date"
-                      class="date-input"
-                      value={review?.siteVisitDate || ''}
-                      on:change={(e) => handleDateUpdate(quote.id, 'siteVisitDate', e.currentTarget.value)}
-                  />
-                </td>
-                <td>
-                  <input
-                      type="date"
-                      class="date-input"
-                      value={review?.reportDraftDate || ''}
-                      on:change={(e) => handleDateUpdate(quote.id, 'reportDraftDate', e.currentTarget.value)}
-                  />
+                  <div class="date-cell-group">
+                    <label for="site-visit-{quote.id}" class="date-label standard-date-label">Site Visit</label>
+                    <input
+                        id="site-visit-{quote.id}"
+                        type="date"
+                        class="date-input"
+                        value={review?.siteVisitDate || ''}
+                        on:change={(e) => handleDateUpdate(quote.id, 'siteVisitDate', e.currentTarget.value)}
+                    />
+                  </div>
+                  <div class="date-cell-group">
+                    <label for="report-draft-{quote.id}" class="date-label standard-date-label">Draft Report Due</label>
+                    <input
+                        id="report-draft-{quote.id}"
+                        type="date"
+                        class="date-input"
+                        value={review?.reportDraftDate || ''}
+                        on:change={(e) => handleDateUpdate(quote.id, 'reportDraftDate', e.currentTarget.value)}
+                    />
+                  </div>
+
+                  {#if review?.customDates && review.customDates.length > 0}
+                    <hr class="date-divider" />
+                    {#each review.customDates as customDate (customDate.id)}
+                      <div class="date-cell-group custom-date-group">
+                        <div class="custom-date-header">
+                           <input
+                              type="text"
+                              class="custom-date-title-input"
+                              placeholder="Date Title"
+                              value={customDate.title}
+                              on:change={(e) => handleCustomDateChange(quote.id, customDate.id, 'title', e.currentTarget.value)}
+                           />
+                           <button 
+                              class="delete-custom-date-btn" 
+                              title="Delete this date"
+                              on:click={() => handleDeleteCustomDate(quote.id, customDate.id)}
+                           >
+                              &times; 
+                           </button>
+                        </div>
+                        <input
+                            type="date"
+                            class="date-input custom-date-input"
+                            value={customDate.date}
+                            on:change={(e) => handleCustomDateChange(quote.id, customDate.id, 'date', e.currentTarget.value)}
+                        />
+                      </div>
+                    {/each}
+                  {/if}
+
+                  <button 
+                    class="action-btn small add-date-btn" 
+                    on:click={() => handleAddCustomDate(quote.id)}
+                  >
+                    + Add Date
+                  </button>
                 </td>
                 <td>
                   <!-- Notes Cell - Clickable area -->
@@ -408,7 +470,93 @@
       border: 1px solid #ced4da;
       border-radius: 4px;
       font-size: 0.9rem;
-      width: 120px; /* Fixed width for date inputs */
+      /* width: 120px; /* Let width be more flexible */
+      display: block; /* Make input take full width of its container */
+      width: 100%;
+      box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  }
+
+  .date-cell-group {
+    margin-bottom: 0.65rem; /* Increased space between date groups */
+    position: relative; /* For positioning delete button */
+  }
+  
+  .date-label { /* Combined label styles */
+    display: block; /* Make label appear on its own line */
+    font-size: 0.8rem; /* Smaller label text */
+    margin-bottom: 0.2rem; /* Space between label and input */
+    color: #555;
+    font-weight: 500;
+  }
+
+  .standard-date-label { 
+    /* Specific styles for standard labels if needed */
+  }
+
+  .date-cell-group:last-of-type { /* Target last group before button */
+      margin-bottom: 0.75rem; /* Add margin before the button */
+  }
+
+  /* Custom Date Styles */
+  .custom-date-group {
+    /* Specific styling if needed */
+  }
+
+  .custom-date-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.2rem;
+  }
+
+  .custom-date-title-input {
+      flex-grow: 1;
+      border: none;
+      border-bottom: 1px dashed #ced4da;
+      font-size: 0.8rem;
+      padding: 0.1rem 0;
+      font-weight: 500;
+      color: #555;
+      margin-right: 0.5rem;
+      background: transparent;
+  }
+  .custom-date-title-input:focus {
+      outline: none;
+      border-bottom: 1px solid #007bff;
+  }
+
+  .delete-custom-date-btn {
+      background: none;
+      border: none;
+      color: #dc3545;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0 0.2rem;
+      line-height: 1;
+  }
+  .delete-custom-date-btn:hover {
+      color: #a71d2a;
+  }
+
+  .custom-date-input {
+    /* Specific styles for custom date inputs if needed */
+  }
+
+  .date-divider {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 0.75rem 0; /* Space around the divider */
+  }
+
+  .add-date-btn {
+      margin-top: 0.5rem; /* Space above the button */
+      width: 100%; /* Make button fill width */
+      background-color: #e9ecef;
+      color: #495057;
+      border: 1px solid #ced4da;
+  }
+  .add-date-btn:hover {
+      background-color: #dee2e6;
   }
 
   .status-dropdown-container {

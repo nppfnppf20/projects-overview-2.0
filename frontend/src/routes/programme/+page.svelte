@@ -281,24 +281,41 @@
             </tr>
           </thead>
           <tbody>
-            {#each $instructedSurveyors as surveyor (surveyor.id)}
-              {@const review = getReviewForQuote(surveyor.id)} 
-              <tr class:completed={review?.workStatus === 'completed'}>
-                <td class="sticky-col surveyor-name-cell">{surveyor.organisation} <span class="discipline">({surveyor.discipline})</span></td>
+            {#each $instructedSurveyors as quote (quote.id)}
+               {@const review = getReviewForQuote(quote.id)} 
+               <tr class="surveyor-row" class:row-completed={review?.workStatus === 'completed'}>
+                <td class="sticky-col data-cell surveyor-name">
+                    <div>{quote.organisation}</div>
+                    <div class="discipline">{quote.discipline} - {quote.surveyType || 'N/A'}</div>
+                </td>
                 {#each weeks as weekDate (format(weekDate, 'yyyy-MM-dd'))}
-                  <td class="week-cell">
-                    {#if review}
-                        {#if isDateInWeek(review.siteVisitDate, weekDate)}
-                            <div class="timeline-event site-visit">Site Visit</div>
+                  <td class="data-cell week-col">
+                      <div class="cell-content">
+                        {#if review}
+                            {#if isDateInWeek(review.siteVisitDate, weekDate)}
+                                <div class="timeline-item site-visit" title="Site Visit: {review.siteVisitDate}">
+                                    Site Visit
+                                </div>
+                            {/if}
+                            {#if isDateInWeek(review.reportDraftDate, weekDate)}
+                                <div class="timeline-item report-draft" title="Draft Report Due: {review.reportDraftDate}">
+                                    Draft Report
+                                </div>
+                            {/if}
+                            <!-- Loop through custom dates -->
+                            {#each review.customDates || [] as customDate (customDate.id)}
+                                {#if isDateInWeek(customDate.date, weekDate)}
+                                    <div class="timeline-item custom-date" title="{customDate.title}: {customDate.date}">
+                                        {customDate.title || 'Untitled Date'}
+                                    </div>
+                                {/if}
+                            {/each}
                         {/if}
-                        {#if isDateInWeek(review.reportDraftDate, weekDate)}
-                            <div class="timeline-event draft-due">Draft due</div>
-                        {/if}
-                    {/if}
+                      </div>
                   </td>
                 {/each}
-                 <td class="week-cell"></td> 
-              </tr>
+                <td class="data-cell add-week-col"></td>
+               </tr>
             {/each}
           </tbody>
         </table>
@@ -549,15 +566,62 @@
   }
 
   /* Style for completed rows */
-  tbody tr.completed td {
-      background-color: #bdf0bd; /* Brighter light green background */
+  tbody tr.row-completed td {
+      background-color: #e6f7ec; /* Light green background */
   }
 
-  /* Ensure sticky column also gets the background */
-  tbody tr.completed td.sticky-col {
-      background-color: #bdf0bd; 
+  /* Ensure sticky column also gets the completed background */
+  tbody tr.row-completed td.sticky-col {
+      background-color: #e6f7ec; /* Match the light green */
+      /* Optionally add a border or other distinction */
+      /* border-left: 3px solid #28a745; */
+  }
+  
+  tbody tr.row-completed:hover td {
+      background-color: #d4edda; /* Slightly darker green on hover */
+  }
+  tbody tr.row-completed:hover td.sticky-col {
+      background-color: #d4edda; /* Match hover background */
   }
 
-  /* Adjust sticky column hover/focus if needed when completed */
-  /* tbody tr.completed td.sticky-col:hover { ... } */
+  /* Base style for timeline items in surveyor rows */
+  .timeline-item {
+      display: block; /* Ensure it takes full width for truncation */
+      padding: 2px 5px; /* Reduced padding */
+      margin-bottom: 3px; /* Space between items */
+      border-radius: 4px; 
+      font-size: 0.8rem; /* Slightly smaller font */
+      line-height: 1.3; 
+      border: 1px solid transparent; /* Base border */
+      white-space: nowrap; /* Prevent wrapping */
+      overflow: hidden; /* Hide overflow */
+      text-overflow: ellipsis; /* Show ellipsis */
+      cursor: default; /* Indicate non-interactive unless specifically made so */
+  }
+
+  .timeline-item.site-visit {
+      background-color: #fff3cd; /* Softer yellow background */
+      border-color: #ffeeba; /* Matching border */
+      color: #664d03; /* Darker text for contrast */
+  }
+
+  .timeline-item.report-draft {
+      background-color: #cfe2ff; /* Softer blue background */
+      border-color: #b6d4fe; /* Matching border */
+      color: #0a58ca; /* Darker blue text */
+  }
+
+  .timeline-item.custom-date {
+      background-color: #ffe5d0; /* Softer orange background */
+      border-color: #fed8b1; /* Matching border */
+      color: #854404; /* Darker orange text */
+  }
+
+  /* Ensure items stack within a cell if multiple occur */
+  .cell-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px; /* Control spacing between stacked items */
+      /* min-height: 20px; /* Ensure space even if no events - might not be needed */
+  }
 </style> 

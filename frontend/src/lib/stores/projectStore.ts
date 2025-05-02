@@ -247,8 +247,15 @@ export interface UploadedWork {
   url?: string; // New: Add a field for the file URL/path (placeholder for now)
 }
 
+// New interface for individual custom dates
+export interface CustomDate {
+  id: string; // Unique ID for the custom date entry
+  title: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+}
+
 export interface SurveyorReview {
-  id: string; // Unique review ID (e.g., `rev-${Date.now()}`)
+  id: string; // Unique review ID
   projectId: string; // Link to project
   quoteId: string; // Link to the specific quote being reviewed
   quality?: number; // 1-5
@@ -262,70 +269,65 @@ export interface SurveyorReview {
   reportDraftDate?: string; // ISO date string (YYYY-MM-DD)
   workStatus?: WorkStatus; // New: Track work progress
   uploadedWorks?: UploadedWork[]; // New: Array to store uploaded work details
+  customDates?: CustomDate[]; // New: Array for custom dates
 }
 
 // Store for all reviews
 const initialReviews: SurveyorReview[] = [
+    // Example review
     {
         id: 'rev1',
         projectId: 'project-1',
-        quoteId: 'q2', 
-        quality: 5,
-        responsiveness: 4,
-        deliveredOnTime: 5, 
-    overallReview: 5, 
-    notes: 'Excellent work, very thorough and delivered ahead of schedule.', 
-    operationalNotes: 'Site visit complete. Report draft expected next week.',
-    reviewDate: '2023-06-01',
-    siteVisitDate: '2023-05-20',
-    reportDraftDate: '2023-05-28',
-    workStatus: 'completed',
-    uploadedWorks: [
-        { fileName: 'LVIA_Report_v1.pdf', title: 'LVIA Report', version: '1.0', dateUploaded: '2023-05-28', description: 'Initial Draft', url: '/placeholder/LVIA_Report_v1.pdf' }
-    ]
+        quoteId: 'q2', // Assuming q2 is instructed in initialQuotes
+        overallReview: 4,
+        reviewDate: '2023-09-15',
+        siteVisitDate: '2023-10-01',
+        reportDraftDate: '2023-10-15',
+        workStatus: 'in progress',
+        operationalNotes: 'Site visit scheduled.',
+        uploadedWorks: [],
+        customDates: [
+            { id: 'cd1', title: 'Initial Meeting', date: '2023-09-20'}
+        ]
     }
 ];
 
 export const allReviews = writable<SurveyorReview[]>(initialReviews);
 
+// Function to add or update a review
 export function addOrUpdateReview(reviewData: Omit<SurveyorReview, 'id'> & { id?: string }) {
-    allReviews.update(reviews => {
-        const existingReviewIndex = reviews.findIndex(r => r.quoteId === reviewData.quoteId);
-        
-        if (existingReviewIndex !== -1) {
-            // Update existing review
-            const updatedReview = { 
-        ...reviews[existingReviewIndex], 
-                ...reviewData,
-        // Ensure ID is preserved
-        id: reviews[existingReviewIndex].id 
+  allReviews.update(reviews => {
+    const index = reviews.findIndex(r => r.id === reviewData.id || r.quoteId === reviewData.quoteId);
+    
+    if (index !== -1) {
+      // Update existing review
+      const existingReview = reviews[index];
+      reviews[index] = { 
+        ...existingReview, // Keep existing fields
+        ...reviewData,      // Overwrite with new data
+        // Ensure nested arrays like uploadedWorks and customDates are correctly merged if needed
+        // If reviewData contains these fields, they will overwrite the existing ones.
+        // If finer control (e.g., adding one item) is needed, adjust logic here or use dedicated functions.
+        // For this basic update, assume reviewData provides the full intended state for these arrays if included.
+        customDates: reviewData.customDates !== undefined ? reviewData.customDates : existingReview.customDates,
+        uploadedWorks: reviewData.uploadedWorks !== undefined ? reviewData.uploadedWorks : existingReview.uploadedWorks
       };
-            reviews[existingReviewIndex] = updatedReview;
-      console.log('Updated review:', updatedReview);
-        } else {
+    } else {
       // Add new review
-            const newReview: SurveyorReview = {
-        ...reviewData,
-        id: `rev-${Date.now()}`,
-        // Ensure required fields have defaults if not provided in reviewData
-        // Note: The calling functions should ideally provide defaults, but this is a safeguard
-        quality: reviewData.quality ?? undefined, 
-        responsiveness: reviewData.responsiveness ?? undefined, 
-        deliveredOnTime: reviewData.deliveredOnTime ?? undefined, 
-        overallReview: reviewData.overallReview ?? 1, // Default overall if not set
-        notes: reviewData.notes ?? undefined,
-        operationalNotes: reviewData.operationalNotes ?? undefined,
+      const newReview: SurveyorReview = {
+        ...reviewData, // Use provided data
+        id: `rev-${Date.now()}`, // Generate a new ID
+        // Ensure required fields like overallReview and reviewDate have defaults if not provided
+        overallReview: reviewData.overallReview ?? 0, 
         reviewDate: reviewData.reviewDate ?? new Date().toISOString().split('T')[0],
-        siteVisitDate: reviewData.siteVisitDate ?? undefined,
-        reportDraftDate: reviewData.reportDraftDate ?? undefined,
-        workStatus: reviewData.workStatus ?? 'not started',
+        // Initialize arrays if not provided
         uploadedWorks: reviewData.uploadedWorks ?? [],
-            };
+        customDates: reviewData.customDates ?? []
+      };
       reviews.push(newReview);
-      console.log('Added new review:', newReview);
-        }
+    }
     return reviews;
-    });
+  });
 }
 
 export function getReviewForQuote(quoteId: string): SurveyorReview | undefined {
@@ -442,4 +444,71 @@ export function updateProgrammeEvent(updatedEvent: ProgrammeEvent) {
 // Function to delete a programme event by ID
 export function deleteProgrammeEvent(eventId: string) {
   allProgrammeEvents.update(events => events.filter(event => event.id !== eventId));
+}
+
+// --- Helper function to generate unique IDs ---
+function generateId(prefix = 'id') {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+}
+
+// --- Functions specifically for managing Custom Dates within a Review ---
+
+export function addCustomDateToReview(quoteId: string, projectId: string, newDate: Omit<CustomDate, 'id'>) {
+    const customDateId = generateId('cd');
+    const fullCustomDate: CustomDate = { ...newDate, id: customDateId };
+
+    allReviews.update(reviews => {
+        const index = reviews.findIndex(r => r.quoteId === quoteId);
+        if (index !== -1) {
+            const review = reviews[index];
+            const updatedCustomDates = [...(review.customDates || []), fullCustomDate];
+            reviews[index] = { ...review, customDates: updatedCustomDates };
+        } else {
+            // If no review exists yet, create one with this custom date
+            const newReview: SurveyorReview = {
+                id: generateId('rev'),
+                projectId: projectId,
+                quoteId: quoteId,
+                overallReview: 0, // Default values
+                reviewDate: new Date().toISOString().split('T')[0],
+                customDates: [fullCustomDate],
+                uploadedWorks: [], // Initialize other optional fields
+            };
+            reviews.push(newReview);
+        }
+        return reviews;
+    });
+}
+
+export function updateCustomDateInReview(quoteId: string, customDateId: string, updatedData: Partial<Omit<CustomDate, 'id'>>) {
+    allReviews.update(reviews => {
+        const index = reviews.findIndex(r => r.quoteId === quoteId);
+        if (index !== -1) {
+            const review = reviews[index];
+            if (review.customDates) {
+                const customDateIndex = review.customDates.findIndex(cd => cd.id === customDateId);
+                if (customDateIndex !== -1) {
+                    review.customDates[customDateIndex] = { 
+                        ...review.customDates[customDateIndex], 
+                        ...updatedData 
+                    };
+                }
+            }
+        }
+        return reviews; // Return modified array
+    });
+}
+
+
+export function deleteCustomDateFromReview(quoteId: string, customDateId: string) {
+    allReviews.update(reviews => {
+        const index = reviews.findIndex(r => r.quoteId === quoteId);
+        if (index !== -1) {
+            const review = reviews[index];
+            if (review.customDates) {
+                review.customDates = review.customDates.filter(cd => cd.id !== customDateId);
+            }
+        }
+        return reviews; // Return modified array
+    });
 } 
