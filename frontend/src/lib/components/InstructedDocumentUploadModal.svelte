@@ -13,19 +13,33 @@
   let description = ''; // State for the description input
   let isUploading = false;
   let errorMessage = '';
+  let fileInput: HTMLInputElement; // Variable to bind to the input element
 
   const dispatch = createEventDispatcher();
 
-  function close() {
-    if (isUploading) return;
-    showModal = false;
-    files = null; // Reset files on close
-    documentTitle = ''; // Reset title
-    version = ''; // Reset version
-    dateUploaded = new Date().toISOString().split('T')[0]; // Reset date
-    description = ''; // Reset description on close
+  // Function to reset the internal state of the modal
+  function resetState() {
+    files = null;
+    documentTitle = '';
+    version = '';
+    dateUploaded = new Date().toISOString().split('T')[0];
+    description = '';
     errorMessage = '';
+    // Explicitly clear the file input element
+    if (fileInput) {
+      fileInput.value = '';
+    }
+    // Note: isUploading is now reset reliably within handleUpload
+  }
+
+  function close() {
+    showModal = false; // This will trigger the reactive statement below
     dispatch('close');
+  }
+
+  // Reactive statement to reset state when modal is hidden
+  $: if (!showModal) {
+    resetState();
   }
 
   async function handleUpload() {
@@ -66,6 +80,10 @@
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
 
       console.log('Upload successful');
+
+      // Reset isUploading *before* dispatching
+      isUploading = false; 
+
       // Add new fields to the dispatched event
       dispatch('uploadComplete', { 
         quoteId, 
@@ -74,15 +92,18 @@
         title: documentTitle, 
         version, 
         dateUploaded, 
-        description 
+        description, 
+        url: `/uploads/${file.name}` // Placeholder URL using filename
       });
-      close();
 
     } catch (error) {
       console.error('Upload error:', error);
       errorMessage = `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    } finally {
+      // Ensure isUploading is reset even on error
       isUploading = false;
+    } finally {
+       // isUploading is now handled within try/catch blocks for better timing control
+       // finally block might still be useful for other cleanup if needed later
     }
   }
 </script>
@@ -101,7 +122,8 @@
       {/if}
       <div class="form-group">
         <label for="file-upload">Select File:</label>
-        <input type="file" id="file-upload" bind:files disabled={isUploading} />
+        <!-- Bind the input element itself -->
+        <input type="file" id="file-upload" bind:files bind:this={fileInput} disabled={isUploading} />
       </div>
        {#if files && files.length > 0}
         <p>Selected file: {files[0].name}</p>

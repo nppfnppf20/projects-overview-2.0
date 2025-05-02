@@ -5,9 +5,11 @@
     allReviews, 
     addOrUpdateReview, // Use this to update dates
     updateWorkStatus, // Import the new function
+    addUploadedWork, // Import the new function for adding work details
     type Quote, 
     type SurveyorReview, 
-    type WorkStatus // Import the status type
+    type WorkStatus, // Import the status type
+    type UploadedWork // Import the UploadedWork type
   } from "$lib/stores/projectStore";
   import NotesModal from "$lib/components/NotesModal.svelte"; // Import the new modal
   import InstructedDocumentUploadModal from "$lib/components/InstructedDocumentUploadModal.svelte"; // Import the document upload modal
@@ -124,10 +126,26 @@
     currentQuoteForUpload = null;
   }
 
-  function handleDocumentUploadComplete(event: CustomEvent<{ quoteId: string, documentType: string, fileName: string }>) {
-    console.log('Upload complete:', event.detail);
-    // Here you would typically update the UI or state to reflect the new document
-    // For now, we just log it.
+  function handleDocumentUploadComplete(event: CustomEvent<UploadedWork & { quoteId: string, documentType: string }>) {
+    if (!$selectedProject) return;
+    console.log('Upload complete details:', event.detail);
+    
+    // Extract details needed for the store function
+    const { quoteId, fileName, title, version, dateUploaded, description, url } = event.detail;
+    
+    // Prepare the UploadedWork object
+    const workDetails: UploadedWork = {
+        fileName,
+        title,
+        version,
+        dateUploaded,
+        description,
+        url // Include the URL
+    };
+
+    // Call the store function to add the work details
+    addUploadedWork(quoteId, $selectedProject.id, workDetails);
+
     closeDocumentUploadModal(); // Close modal on successful upload
   }
 
@@ -232,13 +250,41 @@
                   </div>
                 </td>
                 <td>
-                  <button 
-                    class="action-btn small" 
-                    title="View/Upload Completed Work"
-                    on:click={() => openDocumentUploadModal(quote)}
-                  >
-                    📎
-                  </button>
+                  <!-- Works Cell - Display list and upload button -->
+                  <div class="works-cell-content">
+                    {#if review?.uploadedWorks && review.uploadedWorks.length > 0}
+                      <ul class="uploaded-works-list">
+                        {#each review.uploadedWorks as work (work.fileName + work.dateUploaded)} 
+                          <li>
+                            <!-- Display details inline -->
+                            <span class="work-title">{work.title || 'No Title'}</span> 
+                            <span class="work-version">(v{work.version || 'N/A'})</span> - 
+                            <span class="work-date">{work.dateUploaded}</span>
+                            {#if work.description}
+                              <span class="work-description"> - {work.description}</span>
+                            {/if}
+                            {#if work.url}
+                              <!-- Add View link -->
+                              <a href={work.url} target="_blank" rel="noopener noreferrer" class="action-link view-link" title={`View ${work.fileName}`}>
+                                View
+                              </a>
+                              <!-- Add Download link/button -->
+                              <a href={work.url} download={work.fileName} class="action-link download-link" title={`Download ${work.fileName}`}>
+                                Download
+                              </a>
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                    <button 
+                      class="action-btn small upload-btn" 
+                      title="Upload Completed Work"
+                      on:click={() => openDocumentUploadModal(quote)}
+                    >
+                      📎 Upload New Work
+                    </button>
+                  </div>
                 </td>
               </tr>
             {/each}
@@ -482,5 +528,129 @@
     border-color: #adb5bd;
     outline: none;
   }
+
+  .submit-btn:hover:not(:disabled) {
+    background-color: #0069d9;
+  }
+
+  .error-message {
+      color: #dc3545;
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      padding: 0.75rem 1.25rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+  }
+
+  /* Styles for Works column */
+  .works-cell-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .uploaded-works-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 150px; /* Limit height and make scrollable if needed */
+    overflow-y: auto;
+    font-size: 0.85rem;
+  }
+
+  .uploaded-works-list li {
+    padding: 0.3rem 0; /* Reduced padding */
+    border-bottom: 1px solid #f1f1f1;
+    white-space: nowrap; /* Prevent wrapping within the list item */
+    overflow: hidden; /* Hide overflow within the list item itself */
+    text-overflow: ellipsis; /* Show ellipsis if content still overflows li */
+  }
+
+  .uploaded-works-list li:last-child {
+    border-bottom: none;
+  }
+
+  /* Remove block display and adjust styles for inline elements */
+  .uploaded-works-list strong, /* Target old strong if still present */
+  .uploaded-works-list .work-title,
+  .uploaded-works-list .work-version,
+  .uploaded-works-list .work-date,
+  .uploaded-works-list .work-description,
+  .uploaded-works-list .work-filename { 
+    display: inline; /* Ensure elements are inline */
+    margin: 0 0.2em; /* Small horizontal spacing */
+    padding: 0;
+    color: #333; /* Consistent color */
+  }
+
+  .uploaded-works-list .work-title {
+      font-weight: 600; /* Make title bold */
+  }
+
+  /* Make description slightly less prominent */
+  .uploaded-works-list .work-description {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0; /* Reset margin */
+    margin-bottom: 0;
+    white-space: nowrap; /* Explicitly keep description on same line */
+    margin-right: 0.5em; /* Add space before the View link */
+  }
+
+  .uploaded-works-list .work-filename {
+    display: inline;
+    margin: 0 0.2em;
+    padding: 0;
+    color: #666;
+  }
+
+  .upload-btn {
+      align-self: flex-start; /* Align button to the start */
+      background-color: #6c757d; /* Consistent button style */
+  }
+
+  .upload-btn:hover {
+      background-color: #5a6268;
+  }
+
+  /* Style for the View/Download links */
+  .action-link {
+      font-size: 0.8rem;
+      margin-left: 0.5em;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      text-decoration: none;
+      border: 1px solid #ced4da;
+      display: inline-block; /* Ensure links behave consistently */
+  }
+  
+  .view-link,
+  .download-link {
+      background-color: #e9ecef;
+      color: #007bff;
+      border-color: #ced4da; /* Explicitly set border color */
+  }
+  
+  .action-link:hover {
+      text-decoration: none;
+      opacity: 0.9;
+  }
+  
+  .view-link:hover,
+  .download-link:hover {
+      background-color: #dee2e6;
+      border-color: #adb5bd;
+      /* Ensure hover color is consistent if needed, though default is fine */
+      /* color: #0056b3; */ 
+  }
+  
+  /* Remove specific download-link hover styles */
+  /*
+  .download-link:hover {
+      background-color: #c3e6cb;
+      border-color: #b1dfbb;
+  }
+  */
 
 </style> 

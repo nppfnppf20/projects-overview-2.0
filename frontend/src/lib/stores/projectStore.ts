@@ -237,6 +237,16 @@ export function deleteQuote(quoteId: string) {
 // --- Review Interface and Store ---
 export type WorkStatus = 'in progress' | 'completed' | 'not started';
 
+// New interface for uploaded work details
+export interface UploadedWork {
+  fileName: string;
+  title: string;
+  version: string;
+  dateUploaded: string;
+  description?: string;
+  url?: string; // New: Add a field for the file URL/path (placeholder for now)
+}
+
 export interface SurveyorReview {
   id: string; 
   projectId: string; 
@@ -248,8 +258,9 @@ export interface SurveyorReview {
   notes?: string; 
   reviewDate: string; 
   siteVisitDate?: string; 
-  reportDraftDate?: string; 
+  reportDraftDate?: string;
   workStatus?: WorkStatus; // New: Track work progress
+  uploadedWorks?: UploadedWork[]; // New: Array to store uploaded work details
 }
 
 // Store for all reviews
@@ -344,6 +355,35 @@ export function updateWorkStatus(quoteId: string, projectId: string, workStatus:
          } : {})
     };
     addOrUpdateReview(reviewData);
+}
+
+// Function to add uploaded work details to a review
+export function addUploadedWork(quoteId: string, projectId: string, workDetails: UploadedWork) {
+  allReviews.update(reviews => {
+    const reviewIndex = reviews.findIndex(r => r.quoteId === quoteId && r.projectId === projectId);
+    
+    if (reviewIndex !== -1) {
+      // Review exists, update it
+      const updatedReview = { ...reviews[reviewIndex] };
+      // Prepend the new work details to the beginning of the array
+      updatedReview.uploadedWorks = [workDetails, ...(updatedReview.uploadedWorks || [])];
+      reviews[reviewIndex] = updatedReview;
+    } else {
+      // Review doesn't exist, create a new one
+      const newReview: SurveyorReview = {
+        id: `rev-${Date.now()}`,
+        projectId,
+        quoteId,
+        overallReview: 0, // Default overall review
+        reviewDate: new Date().toISOString().split('T')[0], // Default review date
+        workStatus: 'in progress', // Default status when work is uploaded
+        uploadedWorks: [workDetails] // Start the array with the new work
+        // Add other default fields as necessary
+      };
+      reviews.push(newReview);
+    }
+    return reviews;
+  });
 }
 
 // --- Programme Event Interface and Store ---
