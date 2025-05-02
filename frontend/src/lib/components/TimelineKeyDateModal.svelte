@@ -1,14 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { format, parseISO } from 'date-fns';
+  import type { ProgrammeEvent } from '$lib/stores/projectStore'; // Import type
 
   export let showModal: boolean = false; // Controlled externally
-  export let initialDate: Date; // The start date of the week clicked
+  export let initialDate: Date | null = null; // Can be null if editing
+  export let eventToEdit: ProgrammeEvent | null = null; // Event being edited
 
-  let title: string = '';
-  // Format initialDate to YYYY-MM-DD for the date input
-  let dateStr: string = format(initialDate, 'yyyy-MM-dd'); 
-  
   // Define color options
   const colorOptions = [
     '#0d6efd', // Bootstrap Primary Blue
@@ -17,11 +15,35 @@
     '#dc3545', // Bootstrap Danger Red
     '#6c757d'  // Bootstrap Secondary Gray
   ];
-  let color: string = colorOptions[0]; // Default to the first option
+  
+  // Local state for form fields
+  let title: string = '';
+  let dateStr: string = ''; 
+  let color: string = colorOptions[0]; 
+  let eventId: string | null = null; // Track the ID for editing/deleting
 
-  const dispatch = createEventDispatcher<{ save: { title: string; date: string; color: string }; cancel: void }>();
+  const dispatch = createEventDispatcher<{ 
+    save: { title: string; date: string; color: string; id?: string }; // Add optional id
+    cancel: void; 
+    delete: { id: string }; // Add delete event
+  }>();
 
   let dialog: HTMLDialogElement;
+
+  // Reactive logic to initialize form based on props
+  $: {
+    if (eventToEdit) {
+      // Editing existing event
+      title = eventToEdit.title;
+      dateStr = eventToEdit.date; // Assumes date is already YYYY-MM-DD string
+      color = eventToEdit.color;
+      eventId = eventToEdit.id;
+    } else {
+      // Adding new event
+      resetForm(initialDate); // Use initialDate for adding
+      eventId = null;
+    }
+  }
 
   // Use dialog element for better accessibility and management
   $: if (dialog && showModal) dialog.showModal();
@@ -32,41 +54,60 @@
       alert('Please fill in all fields.');
       return;
     }
-    dispatch('save', { title, date: dateStr, color });
-    resetForm();
+    // Include id only if we are editing (eventId is not null)
+    const detail: { title: string; date: string; color: string; id?: string } = {
+        title,
+        date: dateStr,
+        color
+    };
+    if (eventId) {
+        detail.id = eventId;
+    }
+    dispatch('save', detail);
+    // Don't reset form here, parent closes modal which triggers reset via reactive block
   }
 
   function handleCancel() {
     dispatch('cancel');
-    resetForm();
-    // Note: dialog.close() is handled by the reactive statement
+    // Reset is handled reactively when eventToEdit/initialDate potentially change
   }
 
-  function resetForm() {
+  function handleDelete() {
+    if (eventId && confirm('Are you sure you want to delete this key date?')) {
+      dispatch('delete', { id: eventId });
+    }
+    // Parent handles closing the modal
+  }
+
+  // Reset form fields, optionally using a date
+  function resetForm(dateForReset: Date | null = null) {
     title = '';
-    dateStr = format(initialDate, 'yyyy-MM-dd'); // Reset date to initial
+    // Use provided date or today if null
+    dateStr = format(dateForReset ?? new Date(), 'yyyy-MM-dd'); 
     color = colorOptions[0]; // Reset to default color
+    eventId = null; // Ensure ID is cleared on reset
   }
   
   // Handle closing via Escape key or clicking backdrop (default dialog behavior)
   function handleDialogClose() {
       if (showModal) { // Only dispatch cancel if modal was meant to be open
           dispatch('cancel');
-          resetForm();
       }
+      // Form state is reset reactively based on props changing
   }
 
-  // Ensure dateStr is updated if initialDate prop changes while modal is hidden
+  // No longer need the reactive block to reset based on showModal
+  /*
   $: if (!showModal) {
-      dateStr = format(initialDate, 'yyyy-MM-dd');
-      color = colorOptions[0]; // Reset color when modal is hidden too
+      // Resetting is now handled by the main reactive block
   }
+  */
 
 </script>
 
 <dialog bind:this={dialog} on:close={handleDialogClose} class="key-date-modal">
   <form method="dialog" on:submit|preventDefault={handleSave}>
-    <h2>Add New Key Date</h2>
+    <h2>{eventId ? 'Edit Key Date' : 'Add New Key Date'}</h2>
     
     <div class="form-group">
       <label for="key-date-title">Title:</label>
@@ -75,7 +116,6 @@
 
     <div class="form-group">
       <label for="key-date-date">Date:</label>
-      <!-- Date input defaults to the start of the clicked week -->
       <input type="date" id="key-date-date" bind:value={dateStr} required />
     </div>
 
@@ -92,17 +132,19 @@
                   aria-label="Select color {option}"
                   title="Select color {option}"
               >
-                 <!-- Optional: Checkmark for selected -->
                  {#if color === option}✓{/if}
               </button>
           {/each}
       </div>
-      <!-- Removed input type=color and preview span -->
     </div>
 
     <div class="modal-actions">
+      {#if eventId} 
+          <button type="button" class="danger" on:click={handleDelete}>Delete</button>
+          <div style="flex-grow: 1;"></div> 
+      {/if}
       <button type="button" on:click={handleCancel}>Cancel</button>
-      <button type="submit" class="primary">Save Key Date</button>
+      <button type="submit" class="primary">{eventId ? 'Update' : 'Save'} Key Date</button>
     </div>
   </form>
 </dialog>
@@ -211,5 +253,15 @@
   }
   .modal-actions button.primary:hover {
     background-color: #0b5ed7;
+  }
+  
+  /* Add styles for delete button */
+  .modal-actions button.danger {
+      background-color: #dc3545; 
+      color: white;
+      border-color: #dc3545;
+  }
+  .modal-actions button.danger:hover {
+      background-color: #bb2d3b;
   }
 </style> 

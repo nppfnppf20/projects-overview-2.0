@@ -426,23 +426,20 @@ const initialProgrammeEvents: ProgrammeEvent[] = [
 
 export const allProgrammeEvents = writable<ProgrammeEvent[]>(initialProgrammeEvents);
 
-export function addProgrammeEvent(eventData: Omit<ProgrammeEvent, 'id'>) {
-  const newEvent: ProgrammeEvent = {
-    ...eventData,
-    id: `evt-${Date.now()}`
-  };
+export function addProgrammeEvent(event: Omit<ProgrammeEvent, 'id'>) {
+  // Use a simple timestamp-based ID for now
+  const newEvent = { ...event, id: `evt-${Date.now()}` }; 
   allProgrammeEvents.update(events => [...events, newEvent]);
 }
 
-// Optional: Add update/delete functions later if needed
-export function updateProgrammeEvent(eventId: string, updatedData: Partial<ProgrammeEvent>) {
-     allProgrammeEvents.update(events => 
-        events.map(event => 
-            event.id === eventId ? { ...event, ...updatedData } : event
-        )
-    );
+// Function to update an existing programme event
+export function updateProgrammeEvent(updatedEvent: ProgrammeEvent) {
+  allProgrammeEvents.update(events => 
+    events.map(event => (event.id === updatedEvent.id ? updatedEvent : event))
+  );
 }
 
+// Function to delete a programme event by ID
 export function deleteProgrammeEvent(eventId: string) {
-    allProgrammeEvents.update(events => events.filter(event => event.id !== eventId));
+  allProgrammeEvents.update(events => events.filter(event => event.id !== eventId));
 } 

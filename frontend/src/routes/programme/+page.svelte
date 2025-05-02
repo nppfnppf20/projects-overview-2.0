@@ -3,6 +3,8 @@
     selectedProject, 
     allProgrammeEvents, 
     addProgrammeEvent,
+    updateProgrammeEvent,
+    deleteProgrammeEvent,
     type ProgrammeEvent,
     allQuotes,
     type Quote,
@@ -162,31 +164,60 @@
   // --- Component State ---
   let showTimelineKeyDateModal = false;
   let selectedWeekStartDateForModal: Date | null = null;
+  let eventBeingEdited: ProgrammeEvent | null = null;
 
   // --- Modal Handlers ---
   function handleOpenKeyDateModal(weekDate: Date) {
     selectedWeekStartDateForModal = weekDate;
+    eventBeingEdited = null;
+    showTimelineKeyDateModal = true;
+  }
+
+  function handleEditKeyDate(event: ProgrammeEvent) {
+    eventBeingEdited = event;
+    selectedWeekStartDateForModal = null;
     showTimelineKeyDateModal = true;
   }
 
   function handleKeyDateCancel() {
     showTimelineKeyDateModal = false;
     selectedWeekStartDateForModal = null;
+    eventBeingEdited = null;
   }
 
-  function handleKeyDateSave(event: CustomEvent<{ title: string; date: string; color: string }>) {
+  function handleKeyDateSave(event: CustomEvent<{ title: string; date: string; color: string; id?: string }>) {
     if (!$selectedProject) return;
-    const { title, date, color } = event.detail;
-    
-    addProgrammeEvent({
-        projectId: $selectedProject.id,
-        title,
-        date, // Date is already in YYYY-MM-DD string format from modal
-        color
-    });
+    const { title, date, color, id } = event.detail;
 
-    showTimelineKeyDateModal = false; // Close modal
+    if (id && eventBeingEdited) {
+        updateProgrammeEvent({ 
+            ...eventBeingEdited,
+            title, 
+            date, 
+            color 
+        });
+    } else {
+        addProgrammeEvent({
+            projectId: $selectedProject.id,
+            title,
+            date, 
+            color
+        });
+    }
+
+    showTimelineKeyDateModal = false;
     selectedWeekStartDateForModal = null;
+    eventBeingEdited = null;
+  }
+
+  function handleKeyDateDelete(event: CustomEvent<{ id: string }>) {
+    if (!$selectedProject) return;
+    const { id } = event.detail;
+    deleteProgrammeEvent(id);
+
+    showTimelineKeyDateModal = false;
+    selectedWeekStartDateForModal = null;
+    eventBeingEdited = null;
   }
 
 </script>
@@ -225,7 +256,11 @@
                                    <div 
                                        class="timeline-key-event"
                                        style="background-color: {event.color}; border-left: 3px solid {event.color === '#ffffff' ? '#ccc' : event.color};" 
-                                       title="{event.title} ({format(parseISO(event.date), 'd MMM')})"
+                                       title="{event.title} ({format(parseISO(event.date), 'd MMM')}) - Click to edit" 
+                                       on:click={() => handleEditKeyDate(event)}
+                                       role="button"
+                                       tabindex="0"
+                                       on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleEditKeyDate(event); }}
                                     >
                                        {event.title}
                                    </div>
@@ -279,12 +314,14 @@
   {/if}
 
   <!-- Render Key Date Modal -->
-  {#if showTimelineKeyDateModal && selectedWeekStartDateForModal}
+  {#if showTimelineKeyDateModal}
     <TimelineKeyDateModal 
       bind:showModal={showTimelineKeyDateModal}
       initialDate={selectedWeekStartDateForModal} 
+      eventToEdit={eventBeingEdited}
       on:save={handleKeyDateSave} 
       on:cancel={handleKeyDateCancel} 
+      on:delete={handleKeyDateDelete}
     />
   {/if}
 </div>
@@ -423,15 +460,18 @@
       padding: 1px 4px;
       border-radius: 3px;
       margin-bottom: 2px;
-      /* white-space: nowrap; */ /* Removed */
-      /* overflow: hidden; */   /* Removed */
-      /* text-overflow: ellipsis; */ /* Removed */
       white-space: normal; /* Explicitly allow wrapping */
       color: #333; 
       border: 1px solid rgba(0,0,0,0.1);
       line-height: 1.3;
-      /* max-width: 95%; */ /* Removed max-width */
       display: block; /* Ensure it takes block space for wrapping */
+      cursor: pointer;
+  }
+
+  .timeline-key-event:hover,
+  .timeline-key-event:focus {
+      border-color: #333;
+      outline: 1px solid #333;
   }
 
   .add-key-date-btn {
@@ -449,10 +489,6 @@
       justify-content: center;
       padding: 0;
       line-height: 1;
-      /* Position button at bottom right */
-      /* position: absolute; */ /* Or keep inline below events */
-      /* bottom: 2px; */
-      /* right: 2px; */
       margin-top: 2px; /* Add some space if inline */
   }
   .add-key-date-btn:hover {
