@@ -13,6 +13,7 @@
   import LineItemsModal from '$lib/components/LineItemsModal.svelte';
   import PartiallyInstructedModal from '$lib/components/PartiallyInstructedModal.svelte';
   import DocumentUploadModal from '$lib/components/DocumentUploadModal.svelte';
+  import NotesModal from '$lib/components/NotesModal.svelte';
   
   // Instruction status options for dropdown (can be imported or defined here)
   const instructionStatuses: InstructionStatus[] = [
@@ -26,6 +27,10 @@
   let showNewQuoteModal = false;
   let isEditing = false;
   let quoteToEditId: string | null = null;
+  
+  // State for Add/Edit Notes Modal (within New Quote flow)
+  let showAddNotesModal = false;
+  let currentNotesForModal: string | undefined = '';
   
   // Function to create a blank line item object
   function createNewLineItem(): LineItem {
@@ -44,12 +49,14 @@
       additionalNotes: '',
       instructionStatus: 'will not be instructed' as InstructionStatus,
       status: 'pending' as string,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      quoteFile: null as File | null
     };
   }
 
   // New quote/edit quote form data
   let newQuoteForm = createInitialFormState();
+  let quoteFileInput: HTMLInputElement;
   
   // State for viewing line items modal
   let showLineItemsModal = false;
@@ -65,6 +72,23 @@
   let quoteForDocumentUpload: Quote | null = null;
   let documentUploadType: 'quote' | 'instruction' | null = null;
   
+  // --- Add/Edit Notes Modal Functions (within New Quote flow) ---
+  function openAddNotesModal() {
+    currentNotesForModal = newQuoteForm.additionalNotes;
+    showAddNotesModal = true;
+  }
+
+  function closeAddNotesModal() {
+    showAddNotesModal = false;
+    // Optionally clear currentNotesForModal if needed, but it's probably fine
+  }
+
+  function handleSaveAddNotes(event: CustomEvent<{ notes: string }>) {
+    newQuoteForm.additionalNotes = event.detail.notes;
+    closeAddNotesModal();
+  }
+  // --- End Add/Edit Notes Modal Functions ---
+
   function openNewQuoteModal() {
     resetNewQuoteForm();
     isEditing = false;
@@ -96,6 +120,9 @@
   
   function resetNewQuoteForm() {
     newQuoteForm = createInitialFormState();
+    if (quoteFileInput) {
+        quoteFileInput.value = '';
+    }
   }
   
   function closeNewQuoteModal() {
@@ -136,6 +163,10 @@
     }
     
     const total = validLineItems.reduce((sum, item) => sum + (item.cost || 0), 0);
+
+    if (newQuoteForm.quoteFile) {
+        console.log('Selected file:', newQuoteForm.quoteFile.name);
+    }
 
     const quoteDataForStore: Partial<Quote> = {
       discipline: newQuoteForm.discipline,
@@ -421,11 +452,28 @@
           </div>
           
           <h3>Additional Notes</h3>
-          <textarea 
-            bind:value={newQuoteForm.additionalNotes} 
-            rows="4" 
-            placeholder="Add any additional information here..."
-          ></textarea>
+          <div class="notes-display" on:click={openAddNotesModal} title="Click to edit notes">
+            {#if newQuoteForm.additionalNotes}
+              <pre>{newQuoteForm.additionalNotes}</pre>
+            {:else}
+              <span class="placeholder">Click to add notes...</span>
+            {/if}
+          </div>
+
+          <h3 class="mt-4">Attach Quote Document</h3>
+          <div class="form-group">
+            <label for="quoteFile">Upload File</label>
+            <input 
+              type="file" 
+              id="quoteFile" 
+              bind:this={quoteFileInput} 
+              on:change={(e) => newQuoteForm.quoteFile = e.currentTarget.files ? e.currentTarget.files[0] : null} 
+            />
+            {#if newQuoteForm.quoteFile}
+              <span class="file-name">Selected: {newQuoteForm.quoteFile.name}</span>
+            {/if}
+          </div>
+
         </div>
         
         <div class="modal-footer">
@@ -436,6 +484,16 @@
         </div>
       </div>
     </div>
+  {/if}
+
+  <!-- Notes Modal Instance (for Add/Edit Quote) -->
+  {#if showAddNotesModal}
+    <NotesModal
+      initialNotes={currentNotesForModal}
+      organisationName={newQuoteForm.organisation || 'New Quote'}
+      on:save={handleSaveAddNotes}
+      on:cancel={closeAddNotesModal}
+    />
   {/if}
 
   <!-- Line Items Modal -->
@@ -747,7 +805,7 @@
   h3 {
     font-size: 1.2rem;
     color: #495057;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
   }
   
   .line-items-input-area {
@@ -938,4 +996,40 @@
   .add-quote-btn:hover {
     background-color: #218838;
   }
+
+  /* Added simple margin-top utility class */
+  .mt-4 {
+    margin-top: 1.5rem;
+  }
+
+  /* Styling for the new notes display div */
+  .notes-display {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0.5rem;
+    min-height: 60px;
+    cursor: pointer;
+    background-color: #f8f9fa;
+    transition: background-color 0.2s;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .notes-display:hover {
+    background-color: #e9ecef;
+  }
+
+  .notes-display pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: inherit;
+    font-size: 1rem;
+  }
+
+  .notes-display .placeholder {
+    color: #6c757d;
+    font-style: italic;
+  }
+  /* End Styling for notes display */
 </style> 

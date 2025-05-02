@@ -116,7 +116,6 @@
               <th>Delivered on Time</th>
               <th>Overall Review</th>
               <th>Notes</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -150,17 +149,19 @@
                         on:update={(e) => handleRatingUpdate(quote.id, 'overallReview', e.detail)} 
                     />
                 </td>
-                <td class="notes-cell">
+                <td 
+                  class="notes-cell clickable-notes {review?.notes ? 'has-notes' : 'no-notes'}" 
+                  on:click={() => openNotesModal(quote)} 
+                  title={review?.notes ? "Click to edit notes" : "Click to add notes"}
+                  role="button"
+                  tabindex="0"
+                  on:keypress={(e) => { if (e.key === 'Enter' || e.key === ' ') openNotesModal(quote); }}
+                >
                   {#if review?.notes}
-                    {review.notes.substring(0, 50)}{review.notes.length > 50 ? '...' : ''}
+                    <span>{review.notes}</span>
                   {:else}
-                    -
+                    <span class="placeholder">Add notes...</span>
                   {/if}
-                </td>
-                <td class="action-cell">
-                  <button class="action-btn notes-btn" on:click={() => openNotesModal(quote)} title="View/Edit Notes">
-                    {review?.notes ? 'Edit Notes' : 'Add Notes'}
-                  </button>
                 </td>
               </tr>
             {/each}
@@ -236,10 +237,10 @@
   
   .reviews-table th,
   .reviews-table td {
-    padding: 1rem;
+    padding: 0.8rem 1rem;
     text-align: left;
     border-bottom: 1px solid #eee;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     vertical-align: middle;
   }
   
@@ -259,7 +260,7 @@
   }
   
   .reviews-table td.rating-cell {
-      padding-top: 0.7rem; /* Adjust alignment */
+      padding-top: 0.7rem;
       padding-bottom: 0.7rem;
   }
   
@@ -280,24 +281,19 @@
   }
   
   .action-cell {
-    white-space: nowrap;
+    
   }
   
   .action-btn {
-    padding: 0.4rem 0.75rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.875rem;
+    
   }
-
+  
   .notes-btn {
-    background-color: #6c757d;
-    color: white;
+    
   }
   
   .notes-btn:hover {
-     opacity: 0.9;
+    
   }
 
   .no-data-message {
@@ -431,5 +427,36 @@
   
   .submit-btn:hover {
     background-color: #0069d9;
+  }
+
+  .notes-cell span {
+    display: block;
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0.2rem 0;
+    min-height: 1.4em;
+  }
+
+  .notes-cell span.placeholder {
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  /* Styling for the clickable notes cell */
+  .clickable-notes {
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+  }
+
+  .clickable-notes:hover {
+    background-color: #f0f0f0;
+  }
+
+  .clickable-notes:focus {
+      outline: 2px solid #007bff;
+      outline-offset: -1px;
+      background-color: #e7f3ff;
   }
 </style> 

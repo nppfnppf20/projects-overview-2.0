@@ -79,7 +79,7 @@
   // --- Notes Modal Functions ---
   function openNotesModal(quote: Quote, review: SurveyorReview | undefined) {
     currentQuoteForNotes = quote;
-    currentNotes = review?.notes;
+    currentNotes = review?.operationalNotes;
     showNotesModal = true;
   }
 
@@ -98,16 +98,17 @@
     const reviewData: Omit<SurveyorReview, 'id'> & { id?: string } = {
       projectId: $selectedProject.id,
       quoteId: currentQuoteForNotes.id,
-      notes: newNotes, // Update notes
-      // Provide defaults or existing values for other fields
       quality: existingReview?.quality,
       responsiveness: existingReview?.responsiveness,
       deliveredOnTime: existingReview?.deliveredOnTime,
-      overallReview: existingReview?.overallReview ?? 0,
+      overallReview: existingReview?.overallReview ?? 1,
       reviewDate: existingReview?.reviewDate ?? new Date().toISOString().split('T')[0],
       siteVisitDate: existingReview?.siteVisitDate,
       reportDraftDate: existingReview?.reportDraftDate,
       workStatus: existingReview?.workStatus,
+      uploadedWorks: existingReview?.uploadedWorks,
+      notes: existingReview?.notes,
+      operationalNotes: newNotes,
       ...(existingReview?.id ? { id: existingReview.id } : {}),
     };
 
@@ -154,7 +155,7 @@
     if (!notes || notes.trim() === '') {
       return "Add notes...";
     }
-    return notes.split('\n')[0]; // Get first line
+    return notes;
   }
 </script>
 
@@ -239,14 +240,14 @@
                 <td>
                   <!-- Notes Cell - Clickable area -->
                   <div 
-                    class="notes-preview {review?.notes ? 'has-notes' : 'no-notes'}"
+                    class="notes-preview {review?.operationalNotes ? 'has-notes' : 'no-notes'}"
                     on:click={() => openNotesModal(quote, review)}
                     role="button"
                     tabindex="0"
-                    title={review?.notes ? "Click to edit notes" : "Click to add notes"}
+                    title={review?.operationalNotes ? "Click to edit notes" : "Click to add notes"}
                     on:keypress={(e) => { if (e.key === 'Enter') openNotesModal(quote, review); }}
                   >
-                    {getNotesPreview(review?.notes)}
+                    {getNotesPreview(review?.operationalNotes)}
                   </div>
                 </td>
                 <td>
@@ -499,34 +500,35 @@
       display: none; /* Or simply remove these rules */
   }
 
-  /* Notes Preview Styles */
+  /* Notes Cell Styling */
   .notes-preview {
     cursor: pointer;
     padding: 0.4rem 0.6rem;
-    border: 1px dashed #ced4da; /* Dashed border to look editable */
     border-radius: 4px;
-    background-color: #f8f9fa;
-    color: #6c757d; /* Grey text for placeholder */
-    font-size: 0.85rem;
+    transition: background-color 0.2s;
+    display: inline-block; /* Or block, depending on desired layout */
+    max-width: 250px; /* Adjust width as needed */
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis; /* Show ellipsis if text overflows */
-    display: block; /* Ensure it behaves as a block for overflow */
-    max-width: 250px; /* Explicitly set a max width */
-    transition: background-color 0.2s, border-color 0.2s;
+    text-overflow: ellipsis;
+    vertical-align: middle; /* Align with other cell content */
+    line-height: 1.4; /* Adjust for better vertical alignment if needed */
+  }
+
+  .notes-preview.no-notes {
+    color: #6c757d;
+    font-style: italic;
   }
 
   .notes-preview.has-notes {
-    border-style: solid; /* Solid border if notes exist */
-    background-color: #fff; /* White background for actual notes */
-    color: #333; /* Darker text for actual notes */
+     background-color: #e9ecef; /* Subtle background for cells with notes */
+     border: 1px solid #ced4da;
   }
 
-  .notes-preview:hover, 
+  .notes-preview:hover,
   .notes-preview:focus {
-    background-color: #e9ecef;
-    border-color: #adb5bd;
-    outline: none;
+      background-color: #ced4da; /* Darker hover */
+      outline: none;
   }
 
   .submit-btn:hover:not(:disabled) {

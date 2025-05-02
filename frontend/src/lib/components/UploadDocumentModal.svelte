@@ -149,6 +149,24 @@
     box-sizing: border-box; /* Include padding and border in element's total width and height */
   }
 
+  /* Apply dropdown arrow styling ONLY to the select element */
+  .form-group select {
+    padding: 0.6rem 2.5rem 0.6rem 0.6rem; /* Adjust right padding for arrow */
+    appearance: none; /* Remove default appearance */
+    -webkit-appearance: none; /* Safari/Chrome */
+    -moz-appearance: none; /* Firefox */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='currentColor' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E"); /* Add dropdown arrow */
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center; /* Position the arrow */
+    background-size: 1em; /* Size the arrow */
+    cursor: pointer; /* Indicate it's clickable */
+  }
+
+  /* Style for Firefox / Hide default arrow in IE/Edge */
+  .form-group select::-ms-expand {
+    display: none;
+  }
+
   .file-preview {
     font-size: 0.9rem;
     color: #666;

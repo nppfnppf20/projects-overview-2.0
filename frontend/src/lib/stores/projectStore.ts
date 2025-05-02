@@ -248,17 +248,18 @@ export interface UploadedWork {
 }
 
 export interface SurveyorReview {
-  id: string; 
-  projectId: string; 
-  quoteId: string; 
+  id: string; // Unique review ID (e.g., `rev-${Date.now()}`)
+  projectId: string; // Link to project
+  quoteId: string; // Link to the specific quote being reviewed
   quality?: number; // 1-5
   responsiveness?: number; // 1-5
   deliveredOnTime?: number; // 0-5
   overallReview: number; // 1-5
-  notes?: string; 
-  reviewDate: string; 
-  siteVisitDate?: string; 
-  reportDraftDate?: string;
+  notes?: string; // For review comments (reviews page)
+  operationalNotes?: string; // For operational/progress notes (instructed page)
+  reviewDate: string; // ISO date string (YYYY-MM-DD)
+  siteVisitDate?: string; // ISO date string (YYYY-MM-DD)
+  reportDraftDate?: string; // ISO date string (YYYY-MM-DD)
   workStatus?: WorkStatus; // New: Track work progress
   uploadedWorks?: UploadedWork[]; // New: Array to store uploaded work details
 }
@@ -272,12 +273,16 @@ const initialReviews: SurveyorReview[] = [
         quality: 5,
         responsiveness: 4,
         deliveredOnTime: 5, 
-        overallReview: 4, 
-        notes: 'Very professional and delivered on time.', 
-        reviewDate: '2023-08-01',
-        siteVisitDate: '2023-07-10', 
-        reportDraftDate: '2023-07-25', 
-        workStatus: 'completed' // Example initial work status
+    overallReview: 5, 
+    notes: 'Excellent work, very thorough and delivered ahead of schedule.', 
+    operationalNotes: 'Site visit complete. Report draft expected next week.',
+    reviewDate: '2023-06-01',
+    siteVisitDate: '2023-05-20',
+    reportDraftDate: '2023-05-28',
+    workStatus: 'completed',
+    uploadedWorks: [
+        { fileName: 'LVIA_Report_v1.pdf', title: 'LVIA Report', version: '1.0', dateUploaded: '2023-05-28', description: 'Initial Draft', url: '/placeholder/LVIA_Report_v1.pdf' }
+    ]
     }
 ];
 
@@ -286,42 +291,40 @@ export const allReviews = writable<SurveyorReview[]>(initialReviews);
 export function addOrUpdateReview(reviewData: Omit<SurveyorReview, 'id'> & { id?: string }) {
     allReviews.update(reviews => {
         const existingReviewIndex = reviews.findIndex(r => r.quoteId === reviewData.quoteId);
-        const now = new Date().toISOString().split('T')[0];
         
         if (existingReviewIndex !== -1) {
             // Update existing review
-            const currentReview = reviews[existingReviewIndex];
             const updatedReview = { 
-                ...currentReview, 
+        ...reviews[existingReviewIndex], 
                 ...reviewData,
-                reviewDate: currentReview.reviewDate || now // Keep original review date if exists
-            };
-            // Ensure ratings are within bounds
-            updatedReview.quality = Math.max(0, Math.min(5, updatedReview.quality || 0));
-            updatedReview.responsiveness = Math.max(0, Math.min(5, updatedReview.responsiveness || 0));
-            updatedReview.deliveredOnTime = Math.max(0, Math.min(5, updatedReview.deliveredOnTime || 0));
-            updatedReview.overallReview = Math.max(0, Math.min(5, updatedReview.overallReview || 0)); // Allow 0 if not set
-            
+        // Ensure ID is preserved
+        id: reviews[existingReviewIndex].id 
+      };
             reviews[existingReviewIndex] = updatedReview;
-            return [...reviews];
+      console.log('Updated review:', updatedReview);
         } else {
-            // Add new review, ensuring values are within bounds
+      // Add new review
             const newReview: SurveyorReview = {
-                id: `rev${Date.now()}`,
-                projectId: reviewData.projectId,
-                quoteId: reviewData.quoteId,
-                quality: Math.max(0, Math.min(5, reviewData.quality || 0)),
-                responsiveness: Math.max(0, Math.min(5, reviewData.responsiveness || 0)),
-                deliveredOnTime: Math.max(0, Math.min(5, reviewData.deliveredOnTime || 0)),
-                overallReview: Math.max(0, Math.min(5, reviewData.overallReview || 0)), // Allow 0
-                notes: reviewData.notes || '',
-                reviewDate: reviewData.reviewDate || now,
-                siteVisitDate: reviewData.siteVisitDate,
-                reportDraftDate: reviewData.reportDraftDate,
-                workStatus: reviewData.workStatus || 'not started' // Default work status
+        ...reviewData,
+        id: `rev-${Date.now()}`,
+        // Ensure required fields have defaults if not provided in reviewData
+        // Note: The calling functions should ideally provide defaults, but this is a safeguard
+        quality: reviewData.quality ?? undefined, 
+        responsiveness: reviewData.responsiveness ?? undefined, 
+        deliveredOnTime: reviewData.deliveredOnTime ?? undefined, 
+        overallReview: reviewData.overallReview ?? 1, // Default overall if not set
+        notes: reviewData.notes ?? undefined,
+        operationalNotes: reviewData.operationalNotes ?? undefined,
+        reviewDate: reviewData.reviewDate ?? new Date().toISOString().split('T')[0],
+        siteVisitDate: reviewData.siteVisitDate ?? undefined,
+        reportDraftDate: reviewData.reportDraftDate ?? undefined,
+        workStatus: reviewData.workStatus ?? 'not started',
+        uploadedWorks: reviewData.uploadedWorks ?? [],
             };
-            return [...reviews, newReview];
+      reviews.push(newReview);
+      console.log('Added new review:', newReview);
         }
+    return reviews;
     });
 }
 
