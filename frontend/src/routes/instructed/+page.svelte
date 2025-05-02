@@ -10,7 +10,7 @@
     type WorkStatus // Import the status type
   } from "$lib/stores/projectStore";
   import NotesModal from "$lib/components/NotesModal.svelte"; // Import the new modal
-  import DocumentUploadModal from "$lib/components/DocumentUploadModal.svelte"; // Import the document upload modal
+  import InstructedDocumentUploadModal from "$lib/components/InstructedDocumentUploadModal.svelte"; // Import the document upload modal
   
   // Modal state for Notes
   let showNotesModal = false;
@@ -162,7 +162,7 @@
               <th>Site Visit</th>
               <th>Draft Report Due</th>
               <th>Notes</th>
-              <th>Completed Works</th>
+              <th>Works</th>
             </tr>
           </thead>
           <tbody>
@@ -266,7 +266,7 @@
 
 <!-- Document Upload Modal Instance -->
 {#if showDocumentUploadModal && currentQuoteForUpload}
-  <DocumentUploadModal
+  <InstructedDocumentUploadModal
     bind:showModal={showDocumentUploadModal}
     title={`Upload Completed Work for ${currentQuoteForUpload.organisation}`}
     quoteId={currentQuoteForUpload.id}
